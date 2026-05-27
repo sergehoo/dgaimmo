@@ -3,6 +3,7 @@ import uuid
 from django import forms
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
 from django.utils import timezone
 from django.utils.text import slugify
 
@@ -133,6 +134,100 @@ class MutuelleCreateForm(StyledModelForm):
         if commit:
             instance.save()
         return instance
+
+
+class PublicMutuelleSignupForm(forms.Form):
+    mutuelle_name = forms.CharField(label="Nom de la mutuelle", max_length=180)
+    legal_name = forms.CharField(label="Raison sociale", max_length=180, required=False)
+    country = forms.CharField(label="Pays", max_length=2, initial="CI")
+    currency = forms.CharField(label="Devise", max_length=3, initial="XOF")
+    primary_color = forms.CharField(
+        label="Couleur principale",
+        max_length=16,
+        initial="#003b98",
+        widget=forms.ColorInput(attrs={"class": COLOR_INPUT}),
+    )
+    first_name = forms.CharField(label="Prénom", max_length=150)
+    last_name = forms.CharField(label="Nom", max_length=150)
+    email = forms.EmailField(label="Email professionnel")
+    phone = forms.CharField(label="Téléphone", max_length=32, required=False)
+    password1 = forms.CharField(label="Mot de passe", widget=forms.PasswordInput)
+    password2 = forms.CharField(label="Confirmer le mot de passe", widget=forms.PasswordInput)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for name, field in self.fields.items():
+            if name == "primary_color":
+                continue
+            field.widget.attrs.setdefault("class", BASE_INPUT)
+        self.fields["country"].widget.attrs.setdefault("maxlength", "2")
+        self.fields["currency"].widget.attrs.setdefault("maxlength", "3")
+
+    def clean_email(self):
+        email = self.cleaned_data["email"].strip().lower()
+        User = get_user_model()
+        if User.objects.filter(email=email).exists():
+            raise forms.ValidationError("Un compte existe déjà avec cet email.")
+        return email
+
+    def clean_phone(self):
+        phone = (self.cleaned_data.get("phone") or "").strip()
+        if not phone:
+            return phone
+        User = get_user_model()
+        if User.objects.filter(phone=phone).exists():
+            raise forms.ValidationError("Un compte existe déjà avec ce téléphone.")
+        return phone
+
+    def clean_mutuelle_name(self):
+        name = self.cleaned_data["mutuelle_name"].strip()
+        base_slug = slugify(name)
+        if not base_slug:
+            raise forms.ValidationError("Le nom doit contenir au moins une lettre ou un chiffre.")
+        if Mutuelle.objects.filter(slug=base_slug).exists():
+            raise forms.ValidationError("Une mutuelle avec ce nom existe déjà. Ajoutez une précision au nom.")
+        return name
+
+    def clean_country(self):
+        return self.cleaned_data["country"].strip().upper()
+
+    def clean_currency(self):
+        return self.cleaned_data["currency"].strip().upper()
+
+    def clean(self):
+        cleaned = super().clean()
+        password1 = cleaned.get("password1")
+        password2 = cleaned.get("password2")
+        if password1 and password2 and password1 != password2:
+            self.add_error("password2", "Les mots de passe ne correspondent pas.")
+        if password1:
+            validate_password(password1)
+        return cleaned
+
+    def save(self):
+        User = get_user_model()
+        data = self.cleaned_data
+        mutuelle = Mutuelle.objects.create(
+            name=data["mutuelle_name"],
+            legal_name=data.get("legal_name", ""),
+            slug=slugify(data["mutuelle_name"]),
+            country=data["country"],
+            currency=data["currency"],
+            primary_color=data["primary_color"],
+            accent_color="#0bbf63",
+            status=Mutuelle.Status.ACTIVE,
+        )
+        user = User.objects.create_user(
+            username=data["email"],
+            email=data["email"],
+            password=data["password1"],
+            first_name=data["first_name"],
+            last_name=data["last_name"],
+            phone=data.get("phone") or None,
+            role=User.Role.MUTUELLE_ADMIN,
+            default_mutuelle=mutuelle,
+        )
+        return mutuelle, user
 
 
 class MutuelleBrandingForm(StyledModelForm):

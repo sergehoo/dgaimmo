@@ -3,7 +3,7 @@ from django.http import HttpResponse
 from django.db import transaction
 from django.db.models import Avg, Sum
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth import update_session_auth_hash
+from django.contrib.auth import login, update_session_auth_hash
 from django.contrib.auth.views import LoginView
 from django.utils import timezone
 from decimal import Decimal
@@ -37,6 +37,7 @@ from dashboard.forms import (
     PaymentCreateForm,
     PropertyDocumentUploadForm,
     ProjectCreateForm,
+    PublicMutuelleSignupForm,
     ReservationCreateForm,
     SimulationCreateForm,
     UserPasswordChangeForm,
@@ -44,7 +45,7 @@ from dashboard.forms import (
 )
 from governance.models import GeneralAssembly, Resolution, ResolutionVote
 from memberships.models import Member
-from mutuelles.models import Mutuelle
+from mutuelles.models import Mutuelle, MutuelleMembership
 from notifications.models import Notification
 from notifications.services import queue_notification
 from payments.models import Payment
@@ -87,6 +88,22 @@ def _active_mutuelle(request):
     if not mutuelle:
         mutuelle = Mutuelle.objects.filter(status=Mutuelle.Status.ACTIVE).order_by("created_at").first()
     return mutuelle
+
+
+@transaction.atomic
+def public_mutuelle_signup(request):
+    if request.user.is_authenticated:
+        return redirect("create-mutuelle")
+    form = PublicMutuelleSignupForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        mutuelle, user = form.save()
+        MutuelleMembership.objects.create(mutuelle=mutuelle, user=user, role="admin", permissions=["*"], active=True)
+        TenantQuota.objects.get_or_create(mutuelle=mutuelle)
+        record_login_event(request, LoginEvent.Status.SUCCESS, user=user, metadata={"source": "public_mutuelle_signup"})
+        login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+        upsert_user_device(request, user, trusted=False)
+        return redirect("mutuelle-detail", mutuelle_id=mutuelle.id)
+    return render(request, "dashboard/signup_mutuelle.html", {"form": form})
 
 
 def _tenant_theme(mutuelle=None):

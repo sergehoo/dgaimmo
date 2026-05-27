@@ -3,7 +3,10 @@
 __pycache__/
 *.py[cod]
 .env
+.env.*
+!.env.example
 db.sqlite3
 media/
 staticfiles/
 .venv/
+*.md

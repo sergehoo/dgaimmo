@@ -40,6 +40,7 @@ from dashboard.views import (
     projects_center,
     process_property_document,
     profile_center,
+    public_mutuelle_signup,
     reports_center,
     request_mfa_challenge,
     security_center,
@@ -54,6 +55,7 @@ from dashboard.views import (
 
 urlpatterns = [
     path("", landing_page, name="landing-page"),
+    path("creer-une-mutuelle/", public_mutuelle_signup, name="public-mutuelle-signup"),
     path("connexion/", SecureLoginView.as_view(), name="login"),
     path("deconnexion/", LogoutView.as_view(), name="logout"),
     path("console/", console_dashboard, name="dashboard-home"),

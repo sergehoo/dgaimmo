@@ -1,0 +1,95 @@
+{% extends "base/app.html" %}
+{% load static %}
+{% block content %}
+<div class="min-h-screen bg-[#f7fbff] text-[#06194a]">
+  <div class="mx-auto grid min-h-screen max-w-[1320px] items-center gap-10 px-5 py-10 lg:grid-cols-[.9fr_1.1fr]">
+    <section>
+      <a href="/" class="inline-flex items-center gap-3 no-underline">
+        <span class="grid h-12 w-12 place-items-center rounded-2xl bg-white text-2xl shadow-lg shadow-blue-950/5">⌂</span>
+        <span>
+          <strong class="block text-2xl font-black text-[#06337d]">DGA-IMO<span class="text-[#0aa25f]">360</span></strong>
+          <small class="block text-xs font-bold text-[#536484]">Votre projet, notre priorité</small>
+        </span>
+      </a>
+      <div class="mt-12 max-w-xl">
+        <p class="inline-flex rounded-full border border-[#dce8f8] bg-white px-4 py-2 text-xs font-black uppercase tracking-[.16em] text-[#0b55d9] shadow-sm">Création guidée</p>
+        <h1 class="mt-6 text-5xl font-black leading-tight">Créez votre mutuelle et votre compte administrateur.</h1>
+        <p class="mt-5 text-lg font-semibold leading-8 text-[#536484]">En une étape, votre espace mutualiste est activé, votre compte admin est créé et vous accédez immédiatement à la console.</p>
+      </div>
+      <div class="mt-8 rounded-[32px] border border-white bg-white/80 p-3 shadow-2xl shadow-blue-950/10">
+        <img class="block w-full rounded-[24px]" src="{% static 'img/network-people.svg' %}" alt="Réseau de membres connectés autour d'une mutuelle">
+      </div>
+    </section>
+
+    <section class="rounded-[32px] border border-white bg-white p-6 shadow-2xl shadow-blue-950/12 md:p-8" x-data="{ selected: '{{ form.primary_color.value|default:'#003b98' }}', showPassword:false }">
+      <div class="mb-7">
+        <p class="text-sm font-black uppercase tracking-[.14em] text-[#0b55d9]">Onboarding mutuelle</p>
+        <h2 class="mt-2 text-3xl font-black">Informations de démarrage</h2>
+      </div>
+
+      <form method="post" class="grid gap-6">
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+          <div class="rounded-2xl bg-red-50 p-4 text-sm font-bold text-red-700">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <div>
+          <h3 class="mb-4 text-lg font-black">Mutuelle</h3>
+          <div class="grid gap-4 md:grid-cols-2">
+            {% for field in form %}
+              {% if field.name == 'mutuelle_name' or field.name == 'legal_name' or field.name == 'country' or field.name == 'currency' or field.name == 'primary_color' %}
+              <div class="{% if field.name == 'mutuelle_name' or field.name == 'legal_name' or field.name == 'primary_color' %}md:col-span-2{% endif %}">
+                <label class="mb-2 block text-sm font-black" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {% if field.name == 'primary_color' %}
+                  <div class="rounded-2xl border border-[#e5edf8] bg-[#f7faff] p-4">
+                    <div class="flex flex-wrap items-center gap-4">
+                      {{ field }}
+                      <span class="rounded-xl bg-white px-4 py-3 text-sm font-black" x-text="selected"></span>
+                      <div class="flex flex-wrap gap-2">
+                        <button type="button" @click="selected='#003b98'; document.getElementById('{{ field.id_for_label }}').value=selected" class="h-10 w-10 rounded-xl border-2 border-white shadow-sm" style="background:#003b98"></button>
+                        <button type="button" @click="selected='#0b55d9'; document.getElementById('{{ field.id_for_label }}').value=selected" class="h-10 w-10 rounded-xl border-2 border-white shadow-sm" style="background:#0b55d9"></button>
+                        <button type="button" @click="selected='#06194a'; document.getElementById('{{ field.id_for_label }}').value=selected" class="h-10 w-10 rounded-xl border-2 border-white shadow-sm" style="background:#06194a"></button>
+                        <button type="button" @click="selected='#0aa25f'; document.getElementById('{{ field.id_for_label }}').value=selected" class="h-10 w-10 rounded-xl border-2 border-white shadow-sm" style="background:#0aa25f"></button>
+                        <button type="button" @click="selected='#7c3aed'; document.getElementById('{{ field.id_for_label }}').value=selected" class="h-10 w-10 rounded-xl border-2 border-white shadow-sm" style="background:#7c3aed"></button>
+                      </div>
+                    </div>
+                  </div>
+                {% else %}
+                  {{ field }}
+                {% endif %}
+                {% for error in field.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+              </div>
+              {% endif %}
+            {% endfor %}
+          </div>
+        </div>
+
+        <div>
+          <h3 class="mb-4 text-lg font-black">Compte administrateur</h3>
+          <div class="grid gap-4 md:grid-cols-2">
+            {% for field in form %}
+              {% if field.name == 'first_name' or field.name == 'last_name' or field.name == 'email' or field.name == 'phone' or field.name == 'password1' or field.name == 'password2' %}
+              <div class="{% if field.name == 'email' or field.name == 'phone' %}md:col-span-2{% endif %}">
+                <label class="mb-2 block text-sm font-black" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {% if field.name == 'password1' or field.name == 'password2' %}
+                  <input class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#0b55d9]" id="{{ field.id_for_label }}" name="{{ field.html_name }}" :type="showPassword ? 'text' : 'password'" required>
+                {% else %}
+                  {{ field }}
+                {% endif %}
+                {% for error in field.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+              </div>
+              {% endif %}
+            {% endfor %}
+          </div>
+          <button class="mt-3 text-xs font-black text-[#0b55d9]" type="button" @click="showPassword = !showPassword" x-text="showPassword ? 'Masquer les mots de passe' : 'Afficher les mots de passe'"></button>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3 border-t border-[#edf2fb] pt-6">
+          <button class="rounded-2xl bg-[#003b98] px-7 py-4 text-sm font-black text-white shadow-xl shadow-blue-900/20" type="submit">Créer ma mutuelle</button>
+          <a href="{% url 'login' %}" class="rounded-2xl border border-[#dce7f6] bg-white px-7 py-4 text-sm font-black text-[#06194a] no-underline">J’ai déjà un compte</a>
+        </div>
+      </form>
+    </section>
+  </div>
+</div>
+{% endblock %}

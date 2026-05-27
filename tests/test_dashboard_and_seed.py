@@ -9,9 +9,10 @@ from ai_engine.models import AIAnalysis
 from accounts.models import LoginEvent, OTPChallenge, UserDevice
 from accounts.services import create_otp_challenge
 from claims.models import AssistanceClaim
+from core.models import TenantQuota
 from governance.models import GeneralAssembly, Resolution
 from memberships.models import Member
-from mutuelles.models import Mutuelle
+from mutuelles.models import Mutuelle, MutuelleMembership
 from contributions.models import Contribution, ContributionPlan
 from notifications.models import Notification
 from payments.models import Payment
@@ -22,6 +23,37 @@ from real_estate.models import FinancingScenario, MortgageApplication
 
 
 class DemoSeedAndDashboardTests(TestCase):
+    def test_public_signup_creates_user_and_mutuelle(self):
+        response = self.client.get("/creer-une-mutuelle/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Créer ma mutuelle")
+
+        response = self.client.post(
+            "/creer-une-mutuelle/",
+            {
+                "mutuelle_name": "Diaspora Habitat Premium",
+                "legal_name": "Diaspora Habitat Premium Cooperative",
+                "country": "CI",
+                "currency": "XOF",
+                "primary_color": "#003b98",
+                "first_name": "Awa",
+                "last_name": "Kone",
+                "email": "awa.kone@example.test",
+                "phone": "+2250700000001",
+                "password1": "StrongPass123!",
+                "password2": "StrongPass123!",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        mutuelle = Mutuelle.objects.get(slug="diaspora-habitat-premium")
+        user = get_user_model().objects.get(email="awa.kone@example.test")
+        self.assertEqual(user.default_mutuelle, mutuelle)
+        self.assertEqual(user.role, user.Role.MUTUELLE_ADMIN)
+        self.assertTrue(MutuelleMembership.objects.filter(mutuelle=mutuelle, user=user, active=True).exists())
+        self.assertTrue(TenantQuota.objects.filter(mutuelle=mutuelle).exists())
+        self.assertIn(f"/console/mutuelles/{mutuelle.id}/", response["Location"])
+        self.assertTrue("_auth_user_id" in self.client.session)
+
     def test_console_renders_without_active_mutuelle(self):
         User = get_user_model()
         User.objects.create_user(

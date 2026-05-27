@@ -20,7 +20,7 @@
       </nav>
       <div class="hidden items-center gap-3 sm:flex">
         <a href="{% url 'login' %}" class="rounded-xl border border-[#dce7f6] bg-white px-5 py-3 text-sm font-black text-[#06337d] no-underline">Connexion</a>
-        <a href="{% url 'login' %}?next=/console/mutuelles/nouvelle/" class="rounded-xl bg-[#003b98] px-5 py-3 text-sm font-black text-white no-underline shadow-lg shadow-blue-900/20">Créer une mutuelle</a>
+        <a href="{% url 'public-mutuelle-signup' %}" class="rounded-xl bg-[#003b98] px-5 py-3 text-sm font-black text-white no-underline shadow-lg shadow-blue-900/20">Créer une mutuelle</a>
       </div>
       <button type="button" class="grid h-11 w-11 place-items-center rounded-xl border border-[#dce7f6] bg-white text-xl lg:hidden" @click="open=!open">☰</button>
     </div>
@@ -30,7 +30,7 @@
         <a class="rounded-xl px-3 py-3 hover:bg-[#f3f7ff]" href="#quotite">Quotité</a>
         <a class="rounded-xl px-3 py-3 hover:bg-[#f3f7ff]" href="#projets">Projets</a>
         <a class="rounded-xl px-3 py-3 hover:bg-[#f3f7ff]" href="#plateforme">Plateforme</a>
-        <a class="rounded-xl bg-[#003b98] px-3 py-3 text-white" href="{% url 'login' %}?next=/console/mutuelles/nouvelle/">Créer une mutuelle</a>
+        <a class="rounded-xl bg-[#003b98] px-3 py-3 text-white" href="{% url 'public-mutuelle-signup' %}">Créer une mutuelle</a>
       </div>
     </div>
   </header>
@@ -48,7 +48,7 @@
             DGA-IMO360 transforme les mutuelles, coopératives et entreprises en réseaux de financement collectif : membres qualifiés, quotité cessible, programmes immobiliers, banques et promoteurs dans une seule plateforme.
           </p>
           <div class="mt-8 flex flex-wrap gap-4">
-            <a href="{% url 'login' %}?next=/console/mutuelles/nouvelle/" class="rounded-2xl bg-[#003b98] px-7 py-4 text-sm font-black text-white no-underline shadow-2xl shadow-blue-900/25">Démarrer une mutuelle</a>
+            <a href="{% url 'public-mutuelle-signup' %}" class="rounded-2xl bg-[#003b98] px-7 py-4 text-sm font-black text-white no-underline shadow-2xl shadow-blue-900/25">Démarrer une mutuelle</a>
             <a href="#plateforme" class="rounded-2xl border border-[#d9e4f5] bg-white px-7 py-4 text-sm font-black text-[#06194a] no-underline shadow-sm">Voir la plateforme</a>
           </div>
           <div class="mt-10 grid max-w-2xl gap-3 sm:grid-cols-3">
@@ -173,7 +173,7 @@
           <h2 class="mt-4 text-4xl font-black leading-tight">Créez une mutuelle immobilière pilotée par les données.</h2>
           <p class="mt-4 max-w-2xl text-lg leading-8 text-white/75">Structurez vos membres, simulez la capacité, comparez les programmes et préparez des dossiers lisibles pour les banques et comités.</p>
           <div class="mt-8 flex flex-wrap gap-4">
-            <a href="{% url 'login' %}?next=/console/mutuelles/nouvelle/" class="rounded-xl bg-[#0bbf63] px-6 py-4 text-sm font-black text-white no-underline">Créer une mutuelle</a>
+            <a href="{% url 'public-mutuelle-signup' %}" class="rounded-xl bg-[#0bbf63] px-6 py-4 text-sm font-black text-white no-underline">Créer une mutuelle</a>
             <a href="{% url 'login' %}" class="rounded-xl border border-white/30 px-6 py-4 text-sm font-black text-white no-underline">Se connecter</a>
           </div>
         </div>
