@@ -127,14 +127,10 @@ services:
 
   mutuellex-web:
     <<: *django_app
-    command: >
-      sh -c "python manage.py migrate --noinput &&
-             python manage.py collectstatic --noinput &&
-             gunicorn config.asgi:application
-             -k uvicorn.workers.UvicornWorker
-             --bind 0.0.0.0:8000
-             --workers ${WEB_CONCURRENCY:-3}
-             --timeout ${GUNICORN_TIMEOUT:-60}"
+    command:
+      - sh
+      - -c
+      - python manage.py migrate --noinput && python manage.py collectstatic --noinput && exec gunicorn config.asgi:application -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 --workers ${WEB_CONCURRENCY:-3} --timeout ${GUNICORN_TIMEOUT:-60}
     volumes:
       - mutuellex_media:/app/media:rw
       - mutuellex_static:/app/staticfiles:rw
@@ -152,15 +148,15 @@ services:
           "curl",
           "-fsS",
           "-H",
-          "Host: mutuellex-web",
+          "Host: ${APP_DOMAIN:-localhost}",
           "-H",
           "X-Forwarded-Proto: https",
           "http://127.0.0.1:8000/healthz/"
         ]
       interval: 30s
       timeout: 5s
-      retries: 5
-      start_period: 60s
+      retries: 10
+      start_period: 120s
     labels:
       - traefik.enable=true
       - traefik.docker.network=proxy
