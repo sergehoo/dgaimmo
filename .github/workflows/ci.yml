@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  django:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_DB: mutuellex
+          POSTGRES_USER: mutuellex
+          POSTGRES_PASSWORD: mutuellex
+        ports: ["5432:5432"]
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: python manage.py check
+        env:
+          POSTGRES_HOST: localhost
+          POSTGRES_DB: mutuellex
+          POSTGRES_USER: mutuellex
+          POSTGRES_PASSWORD: mutuellex
+      - run: python manage.py check --deploy
+        env:
+          DJANGO_DEBUG: "0"
+          DJANGO_SECRET_KEY: "ci-only-production-readiness-secret-key-with-more-than-fifty-characters"
+          DJANGO_ALLOWED_HOSTS: "example.com"
+          CSRF_TRUSTED_ORIGINS: "https://example.com"
+          POSTGRES_HOST: localhost
+          POSTGRES_DB: mutuellex
+          POSTGRES_USER: mutuellex
+          POSTGRES_PASSWORD: mutuellex
+          SECURE_SSL_REDIRECT: "1"
+          SESSION_COOKIE_SECURE: "1"
+          CSRF_COOKIE_SECURE: "1"
+      - run: python manage.py test tests.test_dashboard_and_seed tests.test_mvp_workflow real_estate notifications ai_engine governance payments accounts claims
+        env:
+          POSTGRES_HOST: localhost
+          POSTGRES_DB: mutuellex
+          POSTGRES_USER: mutuellex
+          POSTGRES_PASSWORD: mutuellex

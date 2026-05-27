@@ -1,0 +1,68 @@
+{% extends "dashboard/console_base.html" %}
+{% block console_content %}
+<div class="mb-7 flex flex-wrap items-center justify-between gap-4">
+  <div>
+    <p class="text-sm font-bold text-[#536484]">DGA-IMO360 · Workflow</p>
+    <h1 class="text-3xl font-black">{{ title }}</h1>
+    <p class="mt-2 max-w-2xl text-sm font-semibold text-[#536484]">{{ subtitle }}</p>
+  </div>
+  <a href="{% url back_url %}" class="rounded-xl border border-[#dce7f6] bg-white px-5 py-3 text-sm font-black text-[#06337d] no-underline">Retour</a>
+</div>
+
+<section class="grid gap-6 xl:grid-cols-[1fr_.45fr]">
+  <form method="post" enctype="multipart/form-data" class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+      <div class="mb-5 rounded-xl bg-red-50 p-4 text-sm font-bold text-red-700">{{ form.non_field_errors }}</div>
+    {% endif %}
+    <div class="grid gap-5 md:grid-cols-2">
+      {% for field in form %}
+        <div class="{% if field.field.widget.input_type == 'checkbox' or field.field.widget.attrs.rows or field.name == 'primary_color' %}md:col-span-2{% endif %}">
+          <label class="mb-2 block text-sm font-black text-[#06194a]" for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {% if field.field.widget.input_type == 'checkbox' %}
+            <label class="flex items-center gap-3 rounded-xl bg-[#f7faff] p-4 text-sm font-bold text-[#536484]">{{ field }} Activer</label>
+          {% elif field.name == 'primary_color' %}
+            <div x-data="{ selected: '{{ field.value|default:'#0b55d9' }}' }" class="rounded-2xl border border-[#e5edf8] bg-[#f7faff] p-4">
+              <div class="flex flex-wrap items-center gap-4">
+                <div class="flex items-center gap-3">
+                  {{ field }}
+                  <span class="rounded-xl bg-white px-4 py-3 text-sm font-black text-[#06194a]" x-text="selected"></span>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  <button type="button" @click="selected = '#003b98'; document.getElementById('{{ field.id_for_label }}').value = selected" class="h-10 w-10 rounded-xl border-2 border-white shadow-sm" style="background:#003b98" title="Bleu institution"></button>
+                  <button type="button" @click="selected = '#0b55d9'; document.getElementById('{{ field.id_for_label }}').value = selected" class="h-10 w-10 rounded-xl border-2 border-white shadow-sm" style="background:#0b55d9" title="Bleu DGA"></button>
+                  <button type="button" @click="selected = '#06194a'; document.getElementById('{{ field.id_for_label }}').value = selected" class="h-10 w-10 rounded-xl border-2 border-white shadow-sm" style="background:#06194a" title="Navy premium"></button>
+                  <button type="button" @click="selected = '#0aa25f'; document.getElementById('{{ field.id_for_label }}').value = selected" class="h-10 w-10 rounded-xl border-2 border-white shadow-sm" style="background:#0aa25f" title="Vert confiance"></button>
+                  <button type="button" @click="selected = '#12b76a'; document.getElementById('{{ field.id_for_label }}').value = selected" class="h-10 w-10 rounded-xl border-2 border-white shadow-sm" style="background:#12b76a" title="Vert croissance"></button>
+                  <button type="button" @click="selected = '#7c3aed'; document.getElementById('{{ field.id_for_label }}').value = selected" class="h-10 w-10 rounded-xl border-2 border-white shadow-sm" style="background:#7c3aed" title="Violet premium"></button>
+                  <button type="button" @click="selected = '#b7791f'; document.getElementById('{{ field.id_for_label }}').value = selected" class="h-10 w-10 rounded-xl border-2 border-white shadow-sm" style="background:#b7791f" title="Or institutionnel"></button>
+                  <button type="button" @click="selected = '#be123c'; document.getElementById('{{ field.id_for_label }}').value = selected" class="h-10 w-10 rounded-xl border-2 border-white shadow-sm" style="background:#be123c" title="Rose comité"></button>
+                </div>
+              </div>
+              <p class="mt-3 text-xs font-semibold text-[#536484]">Choisissez une couleur dans le sélecteur ou appliquez rapidement une palette proposée.</p>
+            </div>
+          {% else %}
+            {{ field }}
+          {% endif %}
+          {% if field.help_text %}<p class="mt-1 text-xs font-semibold text-[#536484]">{{ field.help_text }}</p>{% endif %}
+          {% for error in field.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+        </div>
+      {% endfor %}
+    </div>
+    <div class="mt-8 flex flex-wrap gap-3">
+      <button type="submit" class="rounded-xl bg-[#0b55d9] px-6 py-4 text-sm font-black text-white shadow-lg shadow-blue-900/20">{{ submit_label }}</button>
+      <a href="{% url back_url %}" class="rounded-xl border border-[#dce7f6] bg-white px-6 py-4 text-sm font-black text-[#06194a] no-underline">Annuler</a>
+    </div>
+  </form>
+
+  <aside class="rounded-2xl bg-[#06194a] p-7 text-white shadow-2xl shadow-blue-950/15">
+    <span class="text-xs font-black uppercase text-[#72e7a6]">Assistance intelligente</span>
+    <h2 class="mt-4 text-2xl font-black">Contrôle qualité dossier</h2>
+    <div class="mt-6 grid gap-4 text-sm text-white/75">
+      <p class="rounded-2xl bg-white/10 p-4">Les champs financiers alimentent automatiquement la quotité cessible et le scoring.</p>
+      <p class="rounded-2xl bg-white/10 p-4">Les données sont rattachées à la mutuelle pour préserver l'isolation tenant.</p>
+      <p class="rounded-2xl bg-white/10 p-4">Les prochaines versions ajouteront OCR, IA comité et PDF de décision.</p>
+    </div>
+  </aside>
+</section>
+{% endblock %}

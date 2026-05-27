@@ -1,0 +1,66 @@
+{% extends "dashboard/console_base.html" %}
+{% block console_content %}
+<div class="mb-7 flex flex-wrap items-center justify-between gap-4">
+  <div>
+    <p class="text-sm font-bold text-[#536484]">MFA, appareils, sessions, audit sécurité</p>
+    <h1 class="text-3xl font-black">Sécurité</h1>
+    <p class="mt-2 max-w-2xl text-sm font-semibold text-[#536484]">Supervisez les connexions, activez MFA et contrôlez les appareils utilisés par les équipes.</p>
+  </div>
+  <div class="flex flex-wrap gap-3">
+    <a href="{% url 'verify-mfa-challenge' %}" class="rounded-xl border border-[#dce7f6] bg-white px-5 py-3 text-sm font-black text-[#0b55d9] no-underline">Vérifier OTP</a>
+    <a href="{% url 'request-mfa-challenge' %}" class="rounded-xl bg-[#0b55d9] px-5 py-3 text-sm font-black text-white no-underline">+ Générer OTP</a>
+  </div>
+</div>
+
+<section class="grid gap-5 md:grid-cols-4">
+  <article class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm"><b class="text-3xl">{{ success_logins|intcomma }}</b><p class="mt-2 font-bold text-[#536484]">Connexions OK</p></article>
+  <article class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm"><b class="text-3xl">{{ failed_logins|intcomma }}</b><p class="mt-2 font-bold text-[#536484]">Échecs login</p></article>
+  <article class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm"><b class="text-3xl">{{ devices|length|intcomma }}</b><p class="mt-2 font-bold text-[#536484]">Appareils</p></article>
+  <article class="rounded-2xl bg-[#06194a] p-6 text-white shadow-2xl shadow-blue-950/15"><b class="text-3xl">{{ mfa_users|intcomma }}</b><p class="mt-2 font-bold text-white/70">Utilisateurs MFA</p></article>
+</section>
+
+<section class="mt-6 grid gap-6 xl:grid-cols-[1fr_.45fr]">
+  <article class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm">
+    <h2 class="text-xl font-black">Journal de connexion</h2>
+    <div class="mt-5 grid gap-4">
+      {% for event in login_events %}
+      <div class="rounded-2xl bg-[#f7faff] p-5">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <b>{{ event.email|default:event.user.email }}</b>
+            <p class="mt-2 text-sm font-bold text-[#536484]">{{ event.ip_address|default:"IP inconnue" }} · {{ event.created_at|date:"d/m/Y H:i" }}</p>
+            <p class="mt-1 text-xs font-semibold text-[#536484]">{{ event.user_agent|truncatechars:120 }}</p>
+          </div>
+          <span class="rounded-full {% if event.status == 'success' %}bg-[#e8fff2] text-[#0b9f5b]{% else %}bg-red-50 text-red-600{% endif %} px-3 py-1 text-xs font-black">{{ event.get_status_display }}</span>
+        </div>
+      </div>
+      {% empty %}
+      <div class="rounded-2xl bg-[#f7faff] p-5"><b>Aucun événement</b><p class="mt-2 text-sm font-bold text-[#536484]">Les connexions apparaîtront ici.</p></div>
+      {% endfor %}
+    </div>
+  </article>
+
+  <aside class="grid gap-6">
+    <div class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm">
+      <h2 class="text-xl font-black">Appareils récents</h2>
+      <div class="mt-5 grid gap-3">
+        {% for device in devices %}
+        <div class="rounded-2xl bg-[#f7faff] p-4"><b>{{ device.user.email }}</b><span class="mt-1 block text-xs font-bold text-[#536484]">{{ device.device_id|truncatechars:24 }} · {{ device.last_ip|default:"IP inconnue" }}</span></div>
+        {% empty %}
+        <p class="text-sm font-bold text-[#536484]">Aucun appareil enregistré.</p>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm">
+      <h2 class="text-xl font-black">OTP récents</h2>
+      <div class="mt-5 grid gap-3">
+        {% for challenge in otp_challenges %}
+        <div class="rounded-2xl bg-[#f7faff] p-4"><b>{{ challenge.user.email }}</b><span class="mt-1 block text-xs font-bold text-[#536484]">{{ challenge.get_status_display }} · expire {{ challenge.expires_at|date:"H:i" }}</span></div>
+        {% empty %}
+        <p class="text-sm font-bold text-[#536484]">Aucun OTP généré.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </aside>
+</section>
+{% endblock %}

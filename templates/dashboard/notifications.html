@@ -1,0 +1,61 @@
+{% extends "dashboard/console_base.html" %}
+{% block console_content %}
+<div class="mb-7 flex flex-wrap items-center justify-between gap-4">
+  <div>
+    <p class="text-sm font-bold text-[#536484]">SMS, WhatsApp, email, push, realtime</p>
+    <h1 class="text-3xl font-black">Alertes & notifications</h1>
+    <p class="mt-2 max-w-2xl text-sm font-semibold text-[#536484]">Pilotez les rappels de cotisation, décisions comité, documents manquants et alertes de risque.</p>
+  </div>
+  <a href="{% url 'create-notification' %}" class="rounded-xl bg-[#0b55d9] px-5 py-3 text-sm font-black text-white no-underline">+ Créer une alerte</a>
+</div>
+
+<section class="grid gap-5 md:grid-cols-4">
+  <article class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm"><b class="text-3xl">{{ notifications|length|intcomma }}</b><p class="mt-2 font-bold text-[#536484]">Messages récents</p></article>
+  <article class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm"><b class="text-3xl">{{ queued_count|intcomma }}</b><p class="mt-2 font-bold text-[#536484]">En file</p></article>
+  <article class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm"><b class="text-3xl">{{ sent_count|intcomma }}</b><p class="mt-2 font-bold text-[#536484]">Envoyées</p></article>
+  <article class="rounded-2xl bg-[#06194a] p-6 text-white shadow-2xl shadow-blue-950/15"><b class="text-3xl">{{ failed_count|intcomma }}</b><p class="mt-2 font-bold text-white/70">À reprendre</p></article>
+</section>
+
+<section class="mt-6 grid gap-6 xl:grid-cols-[1fr_.42fr]" x-data="{ channel: 'all' }">
+  <article class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <h2 class="text-xl font-black">Flux opérationnel</h2>
+      <div class="flex rounded-xl bg-[#f3f7ff] p-1 text-xs font-black">
+        <button type="button" class="rounded-lg px-3 py-2" :class="channel === 'all' ? 'bg-white text-[#0b55d9] shadow-sm' : 'text-[#536484]'" @click="channel = 'all'">Tous</button>
+        <button type="button" class="rounded-lg px-3 py-2" :class="channel === 'sms' ? 'bg-white text-[#0b55d9] shadow-sm' : 'text-[#536484]'" @click="channel = 'sms'">SMS</button>
+        <button type="button" class="rounded-lg px-3 py-2" :class="channel === 'whatsapp' ? 'bg-white text-[#0b55d9] shadow-sm' : 'text-[#536484]'" @click="channel = 'whatsapp'">WhatsApp</button>
+        <button type="button" class="rounded-lg px-3 py-2" :class="channel === 'realtime' ? 'bg-white text-[#0b55d9] shadow-sm' : 'text-[#536484]'" @click="channel = 'realtime'">Live</button>
+      </div>
+    </div>
+    <div class="mt-5 grid gap-4">
+      {% for notification in notifications %}
+      <div class="rounded-2xl bg-[#f7faff] p-5" data-channel="{{ notification.channel }}" x-show="channel === 'all' || channel === '{{ notification.channel }}'">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <b class="text-lg">{{ notification.title }}</b>
+            <p class="mt-2 text-sm font-semibold text-[#536484]">{{ notification.body }}</p>
+            <p class="mt-3 text-xs font-black text-[#536484]">{{ notification.mutuelle.name }}{% if notification.member %} · {{ notification.member.first_name }} {{ notification.member.last_name }}{% endif %}</p>
+          </div>
+          <div class="flex flex-col items-end gap-2">
+            <span class="rounded-full bg-white px-3 py-1 text-xs font-black text-[#0b55d9]">{{ notification.get_channel_display }}</span>
+            <span class="rounded-full {% if notification.status == 'sent' %}bg-[#e8fff2] text-[#0b9f5b]{% elif notification.status == 'failed' %}bg-red-50 text-red-600{% else %}bg-[#fff7df] text-[#b97900]{% endif %} px-3 py-1 text-xs font-black">{{ notification.get_status_display }}</span>
+          </div>
+        </div>
+      </div>
+      {% empty %}
+      <div class="rounded-2xl bg-[#f7faff] p-5"><b>Aucune notification</b><p class="mt-2 text-sm font-bold text-[#536484]">Les rappels et alertes seront visibles ici.</p></div>
+      {% endfor %}
+    </div>
+  </article>
+
+  <aside class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm">
+    <h2 class="text-xl font-black">Scénarios automatisés</h2>
+    <div class="mt-5 grid gap-4 text-sm font-bold text-[#536484]">
+      <p class="rounded-2xl bg-[#f7faff] p-4">J-3 cotisation : rappel Mobile Money personnalisé au membre.</p>
+      <p class="rounded-2xl bg-[#f7faff] p-4">Document foncier incomplet : alerte comité et mandataire responsable.</p>
+      <p class="rounded-2xl bg-[#f7faff] p-4">Quotité fragile : notification de revue manuelle avant réservation de lot.</p>
+      <p class="rounded-2xl bg-[#f7faff] p-4">Décision comité : push temps réel et trace auditée dans le tenant.</p>
+    </div>
+  </aside>
+</section>
+{% endblock %}

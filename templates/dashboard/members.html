@@ -1,0 +1,30 @@
+{% extends "dashboard/console_base.html" %}
+{% block console_content %}
+<div class="mb-7 flex flex-wrap items-center justify-between gap-4">
+  <div><p class="text-sm font-bold text-[#536484]">Réseau mutualiste</p><h1 class="text-3xl font-black">Membres</h1></div>
+  <a href="{% url 'create-member' %}" class="rounded-xl bg-[#0b55d9] px-5 py-3 text-sm font-black text-white no-underline">+ Ajouter un membre</a>
+</div>
+<section class="grid gap-5 lg:grid-cols-[1fr_.55fr]">
+  <article class="rounded-2xl border border-[#e5edf8] bg-white p-5 shadow-sm">
+    <div class="mb-5 flex gap-3"><input class="min-h-12 flex-1 rounded-xl border border-[#e1e9f7] px-4 outline-none" placeholder="Rechercher un membre..."><button class="rounded-xl bg-[#f3f7ff] px-5 font-black">Filtrer</button></div>
+    <div class="overflow-x-auto">
+      <table class="w-full min-w-[720px] text-left text-sm">
+        <thead class="bg-[#f7faff] text-xs uppercase text-[#536484]"><tr><th class="px-4 py-4">Membre</th><th>Mutuelle</th><th>Téléphone</th><th>KYC</th><th>Statut</th></tr></thead>
+        <tbody class="divide-y divide-[#edf2fb]">
+          {% for member in members %}
+          <tr class="font-bold"><td class="px-4 py-4">{{ member.first_name }} {{ member.last_name }}</td><td>{{ member.mutuelle.name }}</td><td>{{ member.phone }}</td><td>{% if member.kyc_validated %}<span class="text-[#0aa25f]">Validé</span>{% else %}En attente{% endif %}</td><td>{{ member.status }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+  <aside class="rounded-2xl border border-[#e5edf8] bg-[#06194a] p-6 text-white shadow-sm">
+    <h2 class="font-black">Scores récents</h2>
+    <div class="mt-5 grid gap-3">
+      {% for simulation in simulations %}
+      <div class="rounded-xl bg-white/10 p-4"><b>{{ simulation.member.first_name }} {{ simulation.member.last_name }}</b><span class="mt-1 block text-sm text-white/70">{{ simulation.get_decision_display }} · {{ simulation.debt_ratio|floatformat:0|intcomma }}%</span></div>
+      {% endfor %}
+    </div>
+  </aside>
+</section>
+{% endblock %}

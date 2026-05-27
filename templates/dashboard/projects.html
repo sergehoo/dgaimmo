@@ -1,0 +1,34 @@
+{% extends "dashboard/console_base.html" %}
+{% block console_content %}
+<div class="mb-7 flex flex-wrap items-center justify-between gap-4">
+  <div><p class="text-sm font-bold text-[#536484]">Opportunités & programmes</p><h1 class="text-3xl font-black">Projets immobiliers</h1></div>
+  <div class="flex flex-wrap gap-3">
+    <a href="{% url 'create-reservation' %}" class="rounded-xl border border-[#dce7f6] bg-white px-5 py-3 text-sm font-black text-[#0b55d9] no-underline">Réserver un lot</a>
+    <a href="{% url 'create-project' %}" class="rounded-xl bg-[#0b55d9] px-5 py-3 text-sm font-black text-white no-underline">+ Nouveau projet</a>
+  </div>
+</div>
+<section class="grid gap-5 md:grid-cols-3">
+  <article class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm"><b class="text-3xl">{{ programs|length|intcomma }}</b><p class="mt-2 font-bold text-[#536484]">Programmes suivis</p></article>
+  <article class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm"><b class="text-3xl">{{ opportunities|length|intcomma }}</b><p class="mt-2 font-bold text-[#536484]">Opportunités actives</p></article>
+  <article class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm"><b class="text-3xl">{{ programs_count|intcomma }}</b><p class="mt-2 font-bold text-[#536484]">Projets en cours</p></article>
+</section>
+<section class="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+  {% for opportunity in opportunities %}
+  <article class="overflow-hidden rounded-2xl border border-[#e5edf8] bg-white shadow-sm">
+    <div class="h-44 bg-gradient-to-br from-[#dce9ff] to-[#f4fff0] p-5">
+      <span class="rounded-full bg-white px-3 py-1 text-xs font-black text-[#0b55d9]">{{ opportunity.get_property_type_display }}</span>
+    </div>
+    <div class="p-6">
+      <h2 class="text-xl font-black">{{ opportunity.title }}</h2>
+      <p class="mt-2 text-sm font-bold text-[#536484]">{{ opportunity.program.name }}</p>
+      <div class="mt-5 grid grid-cols-2 gap-3 text-sm">
+        <p class="rounded-xl bg-[#f7faff] p-3"><b class="block">{{ opportunity.amount|floatformat:0|intcomma }}</b><span class="text-[#536484]">Prix FCFA</span></p>
+        <p class="rounded-xl bg-[#f7faff] p-3"><b class="block">{{ opportunity.available_lots }}</b><span class="text-[#536484]">Lots</span></p>
+      </div>
+    </div>
+  </article>
+  {% empty %}
+  <p class="rounded-2xl bg-white p-6 font-bold text-[#536484]">Aucune opportunité disponible.</p>
+  {% endfor %}
+</section>
+{% endblock %}

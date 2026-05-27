@@ -1,0 +1,20 @@
+{% extends "dashboard/console_base.html" %}
+{% block console_content %}
+<div class="mb-7 flex flex-wrap items-center justify-between gap-4">
+  <div><p class="text-sm font-bold text-[#536484]">Portefeuille SaaS</p><h1 class="text-3xl font-black">Liste des mutuelles</h1></div>
+  <a href="{% url 'create-mutuelle' %}" class="rounded-xl bg-[#0b55d9] px-5 py-3 text-sm font-black text-white no-underline">+ Nouvelle mutuelle</a>
+</div>
+<section class="rounded-2xl border border-[#e5edf8] bg-white p-5 shadow-sm">
+  <div class="mb-5 flex flex-wrap gap-3"><input class="min-h-12 flex-1 rounded-xl border border-[#e1e9f7] px-4 outline-none" placeholder="Rechercher une mutuelle..."><button class="rounded-xl border border-[#e1e9f7] bg-white px-5 text-sm font-black">Statut : Tous</button></div>
+  <div class="overflow-x-auto">
+    <table class="w-full min-w-[900px] text-left text-sm">
+      <thead class="bg-[#f7faff] text-xs font-black uppercase text-[#536484]"><tr><th class="px-4 py-4">Mutuelle</th><th>Entreprise</th><th>Membres</th><th>Capacité d'emprunt</th><th>Statut</th><th>Dernière activité</th><th>Actions</th></tr></thead>
+      <tbody class="divide-y divide-[#edf2fb]">
+        {% for row in mutuelle_rows %}
+        <tr class="font-bold"><td class="px-4 py-5">{{ row.mutuelle.name }}</td><td>{{ row.mutuelle.legal_name|default:"-" }}</td><td>{{ row.members|intcomma }}</td><td>{{ row.capacity|floatformat:0|intcomma }} FCFA</td><td><span class="rounded-full bg-[#e8fff2] px-3 py-1 text-xs text-[#0b9f5b]">{{ row.health }}</span></td><td>{{ row.last_activity|date:"d/m/Y" }}</td><td><a class="rounded-lg bg-[#eaf2ff] px-3 py-2 text-[#0b55d9]" href="{% url 'mutuelle-detail' row.mutuelle.id %}">Voir</a></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

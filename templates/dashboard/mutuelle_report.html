@@ -1,0 +1,91 @@
+{% extends "dashboard/console_base.html" %}
+{% block console_content %}
+<div class="mb-7 flex flex-wrap items-center justify-between gap-4 print:hidden">
+  <div>
+    <p class="text-sm font-bold text-[#536484]">Rapport comité · {{ generated_at|date:"d/m/Y H:i" }}</p>
+    <h1 class="text-3xl font-black">Rapport de santé financière</h1>
+  </div>
+  <div class="flex flex-wrap gap-3">
+    <a href="{% url 'mutuelle-detail' mutuelle.id %}" class="rounded-xl border border-[#dce7f6] bg-white px-5 py-3 text-sm font-black text-[#06337d] no-underline">Retour</a>
+    <a href="{% url 'mutuelle-report-pdf' mutuelle.id %}" class="rounded-xl border border-[#dce7f6] bg-white px-5 py-3 text-sm font-black text-[#06337d] no-underline">PDF</a>
+    <button type="button" onclick="window.print()" class="rounded-xl bg-[#0b55d9] px-5 py-3 text-sm font-black text-white">Imprimer</button>
+  </div>
+</div>
+
+<article class="rounded-3xl border border-[#e5edf8] bg-white p-7 shadow-sm print:border-0 print:shadow-none">
+  <header class="flex flex-wrap items-start justify-between gap-6 border-b border-[#edf2fb] pb-7">
+    <div>
+      <p class="text-sm font-black text-[#0b55d9]">DGA-IMO360</p>
+      <h2 class="mt-2 text-4xl font-black">{{ mutuelle.name }}</h2>
+      <p class="mt-2 max-w-2xl text-sm font-semibold text-[#536484]">{{ mutuelle.legal_name }} · {{ mutuelle.country }} · {{ mutuelle.currency }}</p>
+    </div>
+    <div class="rounded-2xl bg-[#06194a] p-6 text-white">
+      <span class="text-xs font-black uppercase text-[#9fb7ff]">Score global</span>
+      <b class="mt-3 block text-4xl">{{ score.score|default:0 }}/100</b>
+      <p class="mt-1 text-sm font-bold text-white/70">{{ score.health_level|default:"Analyse en cours" }}</p>
+    </div>
+  </header>
+
+  <section class="mt-7 grid gap-4 md:grid-cols-4">
+    <div class="rounded-2xl bg-[#f7faff] p-5"><span class="text-xs font-black uppercase text-[#536484]">Membres actifs</span><b class="mt-3 block text-2xl">{{ active_members|intcomma }}</b></div>
+    <div class="rounded-2xl bg-[#f7faff] p-5"><span class="text-xs font-black uppercase text-[#536484]">Trésorerie</span><b class="mt-3 block text-2xl">{{ treasury_balance|floatformat:0|intcomma }}</b></div>
+    <div class="rounded-2xl bg-[#f7faff] p-5"><span class="text-xs font-black uppercase text-[#536484]">Capacité collective</span><b class="mt-3 block text-2xl">{{ collective_capacity|floatformat:0|intcomma }}</b></div>
+    <div class="rounded-2xl bg-[#f7faff] p-5"><span class="text-xs font-black uppercase text-[#536484]">Programmes</span><b class="mt-3 block text-2xl">{{ programs_count|intcomma }}</b></div>
+  </section>
+
+  <section class="mt-7 grid gap-6 xl:grid-cols-[1fr_.7fr]">
+    <div class="rounded-2xl border border-[#e5edf8] p-6">
+      <h3 class="text-xl font-black">Résumé financier</h3>
+      <div class="mt-5 grid gap-3 text-sm font-bold">
+        <p class="flex justify-between border-b border-[#edf2fb] pb-3"><span>Capacité maximale financement collectif</span><b>{{ collective_capacity|floatformat:0|intcomma }} FCFA</b></p>
+        <p class="flex justify-between border-b border-[#edf2fb] pb-3"><span>Garantie bancaire maximale</span><b>{{ score.max_bank_guarantee|default:0|floatformat:0|intcomma }} FCFA</b></p>
+        <p class="flex justify-between border-b border-[#edf2fb] pb-3"><span>Niveau de risque</span><b>{{ score.risk_level|default:"medium" }}</b></p>
+        <p class="flex justify-between"><span>Réservations immobilières</span><b>{{ reservations_count|intcomma }}</b></p>
+      </div>
+    </div>
+    <div class="rounded-2xl bg-[#f7faff] p-6">
+      <h3 class="text-xl font-black">Recommandations IA</h3>
+      <div class="mt-5 grid gap-3 text-sm font-bold text-[#536484]">
+        {% for recommendation in score.recommendations %}
+        <p class="rounded-xl bg-white p-4">{{ recommendation }}</p>
+        {% empty %}
+        <p class="rounded-xl bg-white p-4">Consolider les cotisations régulières, compléter les documents fonciers et suivre les simulations de quotité avant engagement bancaire.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <section class="mt-7 grid gap-6 xl:grid-cols-3">
+    <div class="rounded-2xl border border-[#e5edf8] p-6">
+      <h3 class="font-black">Membres suivis</h3>
+      <div class="mt-4 grid gap-3 text-sm font-bold">
+        {% for member in members %}
+        <p class="flex justify-between rounded-xl bg-[#f7faff] p-3"><span>{{ member.first_name }} {{ member.last_name }}</span><span>{{ member.status }}</span></p>
+        {% empty %}
+        <p class="rounded-xl bg-[#f7faff] p-3 text-[#536484]">Aucun membre.</p>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="rounded-2xl border border-[#e5edf8] p-6">
+      <h3 class="font-black">Documents</h3>
+      <div class="mt-4 grid gap-3 text-sm font-bold">
+        {% for document in documents %}
+        <p class="rounded-xl bg-[#f7faff] p-3">{{ document.document_type }}<span class="block text-xs text-[#536484]">{{ document.program.name }} · {% if document.verified %}validé{% else %}OCR en attente{% endif %}</span></p>
+        {% empty %}
+        <p class="rounded-xl bg-[#f7faff] p-3 text-[#536484]">Aucun document foncier.</p>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="rounded-2xl border border-[#e5edf8] p-6">
+      <h3 class="font-black">Cotisations récentes</h3>
+      <div class="mt-4 grid gap-3 text-sm font-bold">
+        {% for contribution in contributions %}
+        <p class="rounded-xl bg-[#f7faff] p-3">{{ contribution.member.first_name }} {{ contribution.member.last_name }}<span class="block text-xs text-[#536484]">{{ contribution.amount|floatformat:0|intcomma }} {{ contribution.currency }} · {{ contribution.status }}</span></p>
+        {% empty %}
+        <p class="rounded-xl bg-[#f7faff] p-3 text-[#536484]">Aucune cotisation.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+</article>
+{% endblock %}

@@ -1,0 +1,104 @@
+services:
+  web:
+    build: .
+    command: gunicorn config.asgi:application -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 --workers 3
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - media:/app/media
+      - staticfiles:/app/staticfiles
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.mutuellex.rule=Host(`${APP_DOMAIN:-localhost}`)
+      - traefik.http.routers.mutuellex.entrypoints=websecure
+      - traefik.http.routers.mutuellex.tls.certresolver=letsencrypt
+      - traefik.http.services.mutuellex.loadbalancer.server.port=8000
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://127.0.0.1:8000/healthz/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  celery:
+    build: .
+    command: celery -A config.celery worker -l info
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  beat:
+    build: .
+    command: celery -A config.celery beat -l info
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  flower:
+    build: .
+    command: celery -A config.celery flower --port=5555
+    env_file: .env
+    depends_on:
+      - redis
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.flower.rule=Host(`flower.${APP_DOMAIN:-localhost}`)
+      - traefik.http.services.flower.loadbalancer.server.port=5555
+
+  postgres:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mutuellex}
+      POSTGRES_USER: ${POSTGRES_USER:-mutuellex}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mutuellex}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-mutuellex} -d $${POSTGRES_DB:-mutuellex}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  traefik:
+    image: traefik:v3.0
+    command:
+      - --providers.docker=true
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.letsencrypt.acme.email=${LETSENCRYPT_EMAIL:-admin@example.com}
+      - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - letsencrypt:/letsencrypt
+
+volumes:
+  postgres_data:
+  redis_data:
+  media:
+  staticfiles:
+  letsencrypt:

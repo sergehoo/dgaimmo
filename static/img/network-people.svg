@@ -1,0 +1,81 @@
+<svg width="980" height="620" viewBox="0 0 980 620" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Reseau de membres connectes</title>
+  <desc id="desc">Schema premium de personnes reliees autour d'une mutuelle immobiliere.</desc>
+  <rect width="980" height="620" rx="48" fill="#F7FAFF"/>
+  <circle cx="736" cy="138" r="184" fill="#EAF2FF"/>
+  <circle cx="190" cy="478" r="154" fill="#E9FFF3"/>
+  <path d="M166 438C272 316 390 254 520 250C648 246 738 306 816 406" stroke="#DCE8F8" stroke-width="26" stroke-linecap="round"/>
+  <path d="M195 434C294 340 402 294 518 292C631 290 716 334 789 417" stroke="white" stroke-width="18" stroke-linecap="round"/>
+  <path d="M256 214L451 314L642 214L780 374M451 314L356 470M451 314L610 470M642 214L610 470M256 214L356 470" stroke="#9EB8FF" stroke-width="4" stroke-linecap="round" stroke-dasharray="10 14"/>
+  <path d="M451 314L512 132L642 214" stroke="#C8F63D" stroke-width="5" stroke-linecap="round"/>
+  <g filter="url(#shadow)">
+    <rect x="354" y="230" width="210" height="168" rx="36" fill="#06194A"/>
+    <circle cx="459" cy="290" r="38" fill="#C8F63D"/>
+    <path d="M414 360C425 335 442 324 459 324C476 324 493 335 504 360" stroke="white" stroke-width="14" stroke-linecap="round"/>
+    <path d="M414 356H504" stroke="#C8F63D" stroke-width="12" stroke-linecap="round"/>
+    <rect x="398" y="392" width="122" height="16" rx="8" fill="#EAF2FF"/>
+    <rect x="424" y="420" width="70" height="12" rx="6" fill="#9EB8FF"/>
+  </g>
+  <g filter="url(#smallShadow)">
+    <rect x="188" y="142" width="136" height="132" rx="30" fill="white"/>
+    <circle cx="256" cy="198" r="28" fill="#0B55D9"/>
+    <path d="M220 250C229 231 242 222 256 222C270 222 283 231 292 250" stroke="#06194A" stroke-width="10" stroke-linecap="round"/>
+    <circle cx="320" cy="146" r="12" fill="#C8F63D"/>
+  </g>
+  <g filter="url(#smallShadow)">
+    <rect x="444" y="60" width="136" height="132" rx="30" fill="white"/>
+    <circle cx="512" cy="116" r="28" fill="#C8F63D"/>
+    <path d="M476 168C485 149 498 140 512 140C526 140 539 149 548 168" stroke="#06194A" stroke-width="10" stroke-linecap="round"/>
+    <circle cx="576" cy="64" r="12" fill="#0BBF63"/>
+  </g>
+  <g filter="url(#smallShadow)">
+    <rect x="574" y="142" width="136" height="132" rx="30" fill="white"/>
+    <circle cx="642" cy="198" r="28" fill="#8EA2FF"/>
+    <path d="M606 250C615 231 628 222 642 222C656 222 669 231 678 250" stroke="#06194A" stroke-width="10" stroke-linecap="round"/>
+    <circle cx="706" cy="146" r="12" fill="#C8F63D"/>
+  </g>
+  <g filter="url(#smallShadow)">
+    <rect x="288" y="406" width="136" height="132" rx="30" fill="white"/>
+    <circle cx="356" cy="462" r="28" fill="#0BBF63"/>
+    <path d="M320 514C329 495 342 486 356 486C370 486 383 495 392 514" stroke="#06194A" stroke-width="10" stroke-linecap="round"/>
+    <circle cx="420" cy="410" r="12" fill="#0B55D9"/>
+  </g>
+  <g filter="url(#smallShadow)">
+    <rect x="542" y="406" width="136" height="132" rx="30" fill="white"/>
+    <circle cx="610" cy="462" r="28" fill="#0B55D9"/>
+    <path d="M574 514C583 495 596 486 610 486C624 486 637 495 646 514" stroke="#06194A" stroke-width="10" stroke-linecap="round"/>
+    <circle cx="674" cy="410" r="12" fill="#C8F63D"/>
+  </g>
+  <g filter="url(#smallShadow)">
+    <rect x="712" y="324" width="136" height="132" rx="30" fill="white"/>
+    <circle cx="780" cy="380" r="28" fill="#C8F63D"/>
+    <path d="M744 432C753 413 766 404 780 404C794 404 807 413 816 432" stroke="#06194A" stroke-width="10" stroke-linecap="round"/>
+    <circle cx="844" cy="328" r="12" fill="#0B55D9"/>
+  </g>
+  <rect x="72" y="72" width="184" height="46" rx="23" fill="#06194A"/>
+  <circle cx="101" cy="95" r="10" fill="#C8F63D"/>
+  <rect x="122" y="88" width="104" height="14" rx="7" fill="white" fill-opacity=".86"/>
+  <rect x="690" y="70" width="178" height="46" rx="23" fill="white"/>
+  <circle cx="720" cy="93" r="10" fill="#0B55D9"/>
+  <rect x="742" y="86" width="94" height="14" rx="7" fill="#C9D9F2"/>
+  <defs>
+    <filter id="shadow" x="306" y="190" width="306" height="264" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset dy="8"/>
+      <feGaussianBlur stdDeviation="24"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.0235 0 0 0 0 0.098 0 0 0 0 0.29 0 0 0 0.18 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_1_1"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_1_1" result="shape"/>
+    </filter>
+    <filter id="smallShadow" x="158" y="34" width="720" height="534" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset dy="8"/>
+      <feGaussianBlur stdDeviation="15"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.0235 0 0 0 0 0.098 0 0 0 0 0.29 0 0 0 0.10 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_1_2"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_1_2" result="shape"/>
+    </filter>
+  </defs>
+</svg>

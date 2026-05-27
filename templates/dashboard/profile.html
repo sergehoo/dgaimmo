@@ -1,0 +1,106 @@
+{% extends "dashboard/console_base.html" %}
+{% block console_content %}
+<div class="mb-7 flex flex-wrap items-center justify-between gap-4">
+  <div>
+    <p class="text-sm font-bold text-[#536484]">Compte, accès et sécurité personnelle</p>
+    <h1 class="text-3xl font-black">Mon profil</h1>
+    <p class="mt-2 max-w-2xl text-sm font-semibold text-[#536484]">Mettez à jour vos informations personnelles et renforcez l'accès à votre compte.</p>
+  </div>
+  <a href="{% url 'security-center' %}" class="rounded-xl border border-[#dce7f6] bg-white px-5 py-3 text-sm font-black text-[#0b55d9] no-underline">Centre sécurité</a>
+</div>
+
+<section class="grid gap-5 md:grid-cols-4">
+  <article class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm">
+    <b class="text-3xl">{{ request.user.get_role_display }}</b>
+    <p class="mt-2 font-bold text-[#536484]">Rôle</p>
+  </article>
+  <article class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm">
+    <b class="text-3xl">{{ my_devices|length|intcomma }}</b>
+    <p class="mt-2 font-bold text-[#536484]">Appareils connus</p>
+  </article>
+  <article class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm">
+    <b class="text-3xl">{% if request.user.mfa_enabled %}Actif{% else %}Inactif{% endif %}</b>
+    <p class="mt-2 font-bold text-[#536484]">MFA</p>
+  </article>
+  <article class="rounded-2xl bg-[#06194a] p-6 text-white shadow-2xl shadow-blue-950/15">
+    <b class="text-3xl">{{ request.user.default_mutuelle.name|default:"Global" }}</b>
+    <p class="mt-2 font-bold text-white/70">Mutuelle par défaut</p>
+  </article>
+</section>
+
+<section class="mt-6 grid gap-6 xl:grid-cols-[1fr_.8fr]">
+  <article class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm">
+    <h2 class="text-xl font-black">Informations personnelles</h2>
+    <p class="mt-2 text-sm font-bold text-[#536484]">Ces informations sont utilisées pour vos notifications, audits et affectations de mutuelle.</p>
+    {% if profile_saved %}
+    <div class="mt-5 rounded-xl bg-[#e8fff2] px-4 py-3 text-sm font-black text-[#0b9f5b]">Profil mis à jour.</div>
+    {% endif %}
+    <form method="post" class="mt-6 grid gap-4">
+      {% csrf_token %}
+      <input type="hidden" name="form_kind" value="profile">
+      <div class="grid gap-4 md:grid-cols-2">
+        {% for field in profile_form %}
+        <label class="grid gap-2 text-sm font-black">
+          <span>{{ field.label }}</span>
+          {{ field }}
+          {% if field.errors %}<span class="text-xs text-red-600">{{ field.errors|striptags }}</span>{% endif %}
+        </label>
+        {% endfor %}
+      </div>
+      <button class="mt-2 rounded-xl px-5 py-3 text-sm font-black text-white" style="background: var(--tenant-primary)">Enregistrer le profil</button>
+    </form>
+  </article>
+
+  <article class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm">
+    <h2 class="text-xl font-black">Mot de passe</h2>
+    <p class="mt-2 text-sm font-bold text-[#536484]">Choisissez un mot de passe fort et gardez votre session active après changement.</p>
+    {% if password_saved %}
+    <div class="mt-5 rounded-xl bg-[#e8fff2] px-4 py-3 text-sm font-black text-[#0b9f5b]">Mot de passe mis à jour.</div>
+    {% endif %}
+    <form method="post" class="mt-6 grid gap-4">
+      {% csrf_token %}
+      <input type="hidden" name="form_kind" value="password">
+      {% for field in password_form %}
+      <label class="grid gap-2 text-sm font-black">
+        <span>{{ field.label }}</span>
+        {{ field }}
+        {% if field.help_text %}<span class="text-xs font-bold text-[#667899]">{{ field.help_text|safe }}</span>{% endif %}
+        {% if field.errors %}<span class="text-xs text-red-600">{{ field.errors|striptags }}</span>{% endif %}
+      </label>
+      {% endfor %}
+      {% if password_form.non_field_errors %}<div class="text-sm font-bold text-red-600">{{ password_form.non_field_errors|striptags }}</div>{% endif %}
+      <button class="mt-2 rounded-xl bg-[#06194a] px-5 py-3 text-sm font-black text-white">Changer le mot de passe</button>
+    </form>
+  </article>
+</section>
+
+<section class="mt-6 grid gap-6 xl:grid-cols-2">
+  <article class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm">
+    <h2 class="text-xl font-black">Mes appareils récents</h2>
+    <div class="mt-5 grid gap-3">
+      {% for device in my_devices %}
+      <div class="rounded-2xl bg-[#f7faff] p-4">
+        <b>{{ device.name|default:"Appareil utilisateur" }}</b>
+        <span class="mt-1 block text-xs font-bold text-[#536484]">{{ device.device_id|truncatechars:28 }} · {{ device.last_ip|default:"IP inconnue" }} · {{ device.last_seen_at|date:"d/m/Y H:i" }}</span>
+      </div>
+      {% empty %}
+      <p class="text-sm font-bold text-[#536484]">Aucun appareil enregistré.</p>
+      {% endfor %}
+    </div>
+  </article>
+
+  <article class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm">
+    <h2 class="text-xl font-black">Mes dernières connexions</h2>
+    <div class="mt-5 grid gap-3">
+      {% for event in my_login_events %}
+      <div class="rounded-2xl bg-[#f7faff] p-4">
+        <b>{{ event.get_status_display }}</b>
+        <span class="mt-1 block text-xs font-bold text-[#536484]">{{ event.ip_address|default:"IP inconnue" }} · {{ event.created_at|date:"d/m/Y H:i" }}</span>
+      </div>
+      {% empty %}
+      <p class="text-sm font-bold text-[#536484]">Aucune connexion récente.</p>
+      {% endfor %}
+    </div>
+  </article>
+</section>
+{% endblock %}

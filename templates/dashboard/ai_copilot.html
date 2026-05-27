@@ -1,0 +1,72 @@
+{% extends "dashboard/console_base.html" %}
+{% block console_content %}
+<div class="mb-7 flex flex-wrap items-center justify-between gap-4">
+  <div>
+    <p class="text-sm font-bold text-[#536484]">OpenAI compatible · Ollama local · OCR · scoring</p>
+    <h1 class="text-3xl font-black">Copilote IA immobilier</h1>
+    <p class="mt-2 max-w-2xl text-sm font-semibold text-[#536484]">Générez des notes comité, synthèses banque, alertes de surendettement et recommandations de montage financier.</p>
+  </div>
+  <a href="{% url 'create-ai-decision-note' %}" class="rounded-xl bg-[#0b55d9] px-5 py-3 text-sm font-black text-white no-underline">+ Note IA comité</a>
+</div>
+
+<section class="grid gap-5 md:grid-cols-4">
+  <article class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm"><b class="text-3xl">{{ analyses|length|intcomma }}</b><p class="mt-2 font-bold text-[#536484]">Analyses récentes</p></article>
+  <article class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm"><b class="text-3xl">{{ decision_notes|intcomma }}</b><p class="mt-2 font-bold text-[#536484]">Notes comité</p></article>
+  <article class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm"><b class="text-3xl">{{ fraud_notes|intcomma }}</b><p class="mt-2 font-bold text-[#536484]">Risques fraude</p></article>
+  <article class="rounded-2xl bg-[#06194a] p-6 text-white shadow-2xl shadow-blue-950/15"><b class="text-3xl">{{ ocr_notes|intcomma }}</b><p class="mt-2 font-bold text-white/70">OCR documents</p></article>
+</section>
+
+<section class="mt-6 grid gap-6 xl:grid-cols-[1fr_.42fr]">
+  <article class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <h2 class="text-xl font-black">Historique intelligent</h2>
+      <span class="rounded-full bg-[#eaf2ff] px-4 py-2 text-xs font-black text-[#0b55d9]">Hybride cloud/local</span>
+    </div>
+    <div class="mt-5 grid gap-4">
+      {% for analysis in analyses %}
+      <div class="rounded-2xl bg-[#f7faff] p-5">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <b class="text-lg">{{ analysis.get_analysis_type_display|default:analysis.analysis_type }}</b>
+            <p class="mt-2 text-sm font-semibold text-[#536484]">
+              {% if analysis.result.executive_summary %}{{ analysis.result.executive_summary }}{% elif analysis.result.summary %}{{ analysis.result.summary }}{% else %}{{ analysis.prompt }}{% endif %}
+            </p>
+            <div class="mt-4 flex flex-wrap gap-2 text-xs font-black">
+              <span class="rounded-full bg-white px-3 py-1 text-[#0b55d9]">{{ analysis.get_provider_display }}</span>
+              <span class="rounded-full bg-white px-3 py-1 text-[#536484]">{{ analysis.confidence|floatformat:0|intcomma }}% confiance</span>
+              {% if analysis.result.decision %}<span class="rounded-full bg-[#e8fff2] px-3 py-1 text-[#0b9f5b]">{{ analysis.result.decision }}</span>{% endif %}
+            </div>
+          </div>
+          <span class="text-xs font-bold text-[#536484]">{{ analysis.created_at|date:"d/m/Y H:i" }}</span>
+        </div>
+        {% if analysis.result.risks %}
+        <div class="mt-4 grid gap-2">
+          {% for risk in analysis.result.risks %}
+          <p class="rounded-xl bg-white p-3 text-sm font-bold text-[#536484]">{{ risk }}</p>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      {% empty %}
+      <div class="rounded-2xl bg-[#f7faff] p-5"><b>Aucune analyse IA</b><p class="mt-2 text-sm font-bold text-[#536484]">Lancez une note comité pour alimenter l'historique.</p></div>
+      {% endfor %}
+    </div>
+  </article>
+
+  <aside class="grid gap-6">
+    <div class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm">
+      <h2 class="text-xl font-black">Capacités IA</h2>
+      <div class="mt-5 grid gap-4 text-sm font-bold text-[#536484]">
+        <p class="rounded-2xl bg-[#f7faff] p-4">Comparer banque, mutuelle et financement mixte.</p>
+        <p class="rounded-2xl bg-[#f7faff] p-4">Détecter les risques de surendettement et dossiers incohérents.</p>
+        <p class="rounded-2xl bg-[#f7faff] p-4">Générer une synthèse banque adaptée UEMOA.</p>
+        <p class="rounded-2xl bg-[#f7faff] p-4">Préparer OCR titres fonciers, contrats promoteurs et KYC.</p>
+      </div>
+    </div>
+    <div class="rounded-2xl bg-[#06194a] p-6 text-white shadow-2xl shadow-blue-950/15">
+      <h2 class="text-xl font-black">Architecture hybride</h2>
+      <p class="mt-4 text-sm font-semibold text-white/70">Les données sensibles peuvent rester en local via Ollama, tandis que les synthèses avancées utilisent un fournisseur OpenAI compatible si autorisé.</p>
+    </div>
+  </aside>
+</section>
+{% endblock %}

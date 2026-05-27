@@ -1,0 +1,81 @@
+{% extends "dashboard/console_base.html" %}
+{% block console_content %}
+<div class="mb-7 flex flex-wrap items-center justify-between gap-4">
+  <div>
+    <p class="text-sm font-bold text-[#536484]">Comité, banque, supervision SaaS</p>
+    <h1 class="text-3xl font-black">Rapports</h1>
+    <p class="mt-2 max-w-2xl text-sm font-semibold text-[#536484]">Générez des dossiers de décision prêts pour comité, partenaires bancaires et suivi de solvabilité collective.</p>
+  </div>
+  <a href="{% url 'documents-center' %}" class="rounded-xl border border-[#dce7f6] bg-white px-5 py-3 text-sm font-black text-[#06337d] no-underline">Centre documentaire</a>
+</div>
+
+<section class="grid gap-5 md:grid-cols-3">
+  <article class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm">
+    <span class="text-xs font-black uppercase text-[#536484]">Mutuelles suivies</span>
+    <b class="mt-4 block text-3xl">{{ mutuelles_count|intcomma }}</b>
+    <p class="mt-2 text-sm font-bold text-[#0aa25f]">Rapport santé disponible</p>
+  </article>
+  <article class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm">
+    <span class="text-xs font-black uppercase text-[#536484]">Membres analysés</span>
+    <b class="mt-4 block text-3xl">{{ members_count|intcomma }}</b>
+    <p class="mt-2 text-sm font-bold text-[#536484]">KYC, scoring et quotité cessible</p>
+  </article>
+  <article class="rounded-2xl bg-[#06194a] p-6 text-white shadow-2xl shadow-blue-950/15">
+    <span class="text-xs font-black uppercase text-[#9fb7ff]">Financement mobilisable</span>
+    <b class="mt-4 block text-3xl">{{ financing_total|floatformat:0|intcomma }} FCFA</b>
+    <p class="mt-2 text-sm font-bold text-white/70">Trésorerie active consolidée</p>
+  </article>
+</section>
+
+<section class="mt-6 grid gap-6 xl:grid-cols-[1fr_.45fr]">
+  <article class="overflow-hidden rounded-2xl border border-[#e5edf8] bg-white shadow-sm">
+    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-[#edf2fb] p-6">
+      <div>
+        <h2 class="text-xl font-black">Rapports par mutuelle</h2>
+        <p class="mt-1 text-sm font-semibold text-[#536484]">Synthèse financière, solvabilité, documents et recommandations IA.</p>
+      </div>
+      <span class="rounded-full bg-[#eaf2ff] px-4 py-2 text-xs font-black text-[#0b55d9]">Export PDF actif</span>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full min-w-[760px] text-left text-sm">
+        <thead class="bg-[#f7faff] text-xs uppercase text-[#536484]">
+          <tr>
+            <th class="px-6 py-4">Mutuelle</th>
+            <th class="px-6 py-4">Membres</th>
+            <th class="px-6 py-4">Capacité</th>
+            <th class="px-6 py-4">Score</th>
+            <th class="px-6 py-4">Santé</th>
+            <th class="px-6 py-4">Action</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-[#edf2fb] font-bold">
+          {% for row in mutuelle_rows %}
+          <tr class="hover:bg-[#fbfdff]">
+            <td class="px-6 py-4">
+              <span class="block font-black">{{ row.mutuelle.name }}</span>
+              <span class="text-xs text-[#536484]">{{ row.mutuelle.legal_name }}</span>
+            </td>
+            <td class="px-6 py-4">{{ row.members|intcomma }}</td>
+            <td class="px-6 py-4">{{ row.capacity|floatformat:0|intcomma }} FCFA</td>
+            <td class="px-6 py-4">{{ row.score }}/100</td>
+            <td class="px-6 py-4"><span class="rounded-full bg-[#e8fff2] px-3 py-1 text-xs font-black text-[#0b9f5b]">{{ row.health }}</span></td>
+            <td class="px-6 py-4"><div class="flex gap-2"><a href="{% url 'mutuelle-report' row.mutuelle.id %}" class="rounded-xl bg-[#0b55d9] px-4 py-2 text-xs font-black text-white no-underline">Ouvrir</a><a href="{% url 'mutuelle-report-pdf' row.mutuelle.id %}" class="rounded-xl bg-[#eaf2ff] px-4 py-2 text-xs font-black text-[#0b55d9] no-underline">PDF</a></div></td>
+          </tr>
+          {% empty %}
+          <tr><td class="px-6 py-8 text-[#536484]" colspan="6">Aucune mutuelle disponible.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+
+  <aside class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm">
+    <h2 class="text-xl font-black">Pack décision</h2>
+    <div class="mt-5 grid gap-4 text-sm font-bold text-[#536484]">
+      <p class="rounded-2xl bg-[#f7faff] p-4">Note comité avec score global, capacité collective et risques immobiliers.</p>
+      <p class="rounded-2xl bg-[#f7faff] p-4">Annexe bancaire avec capacité d'emprunt, documents fonciers et simulations membres.</p>
+      <p class="rounded-2xl bg-[#f7faff] p-4">Synthèse IA orientée UEMOA : reste à vivre, concentration du risque et recommandations.</p>
+    </div>
+  </aside>
+</section>
+{% endblock %}

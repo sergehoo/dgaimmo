@@ -1,0 +1,25 @@
+{% extends "dashboard/console_base.html" %}
+{% block console_content %}
+<div class="mb-7 flex flex-wrap items-center justify-between gap-4">
+  <div><p class="text-sm font-bold text-[#536484]">Quotité cessible & capacité</p><h1 class="text-3xl font-black">Simulations</h1></div>
+  <a href="{% url 'create-simulation' %}" class="rounded-xl bg-[#0b55d9] px-5 py-3 text-sm font-black text-white no-underline">+ Nouvelle simulation</a>
+</div>
+<section class="grid gap-5 md:grid-cols-4">
+  <article class="rounded-2xl bg-[#e8fff2] p-6"><b class="text-3xl text-[#0b9f5b]">{{ eligible_count|intcomma }}</b><p class="font-bold text-[#536484]">Éligibles</p></article>
+  <article class="rounded-2xl bg-[#fff7df] p-6"><b class="text-3xl text-[#b97900]">{{ conditional_count|intcomma }}</b><p class="font-bold text-[#536484]">Sous réserve</p></article>
+  <article class="rounded-2xl bg-[#ffecec] p-6"><b class="text-3xl text-[#c93838]">{{ rejected_count|intcomma }}</b><p class="font-bold text-[#536484]">Non éligibles</p></article>
+  <article class="rounded-2xl bg-[#eef4ff] p-6"><b class="text-3xl text-[#0b55d9]">{{ avg_amortization_months|intcomma }}</b><p class="font-bold text-[#536484]">Mois d'amortissement moyen</p></article>
+</section>
+<section class="mt-6 rounded-2xl border border-[#e5edf8] bg-white p-5 shadow-sm">
+  <div class="overflow-x-auto">
+    <table class="w-full min-w-[860px] text-left text-sm">
+      <thead class="bg-[#f7faff] text-xs uppercase text-[#536484]"><tr><th class="px-4 py-4">Membre</th><th>Mutuelle</th><th>Montant demandé</th><th>Période d'amortissement</th><th>Mensualité</th><th>Taux endettement</th><th>Décision</th></tr></thead>
+      <tbody class="divide-y divide-[#edf2fb]">
+        {% for simulation in simulations %}
+        <tr class="font-bold"><td class="px-4 py-4">{{ simulation.member.first_name }} {{ simulation.member.last_name }}</td><td>{{ simulation.mutuelle.name }}</td><td>{{ simulation.requested_amount|floatformat:0|intcomma }}</td><td>{{ simulation.requested_duration_months|intcomma }} mois</td><td>{{ simulation.estimated_payment|floatformat:0|intcomma }}</td><td>{{ simulation.debt_ratio|floatformat:1 }}%</td><td>{{ simulation.get_decision_display }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
