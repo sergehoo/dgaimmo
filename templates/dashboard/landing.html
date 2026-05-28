@@ -5,10 +5,9 @@
   <header class="sticky top-0 z-40 border-b border-[#e7eef9] bg-white/90 backdrop-blur-xl">
     <div class="mx-auto flex h-20 max-w-[1440px] items-center justify-between px-5 lg:px-8">
       <a href="/" class="flex items-center gap-3 no-underline">
-        <span class="grid h-11 w-11 place-items-center rounded-2xl bg-[#eef6ff] text-2xl shadow-inner">⌂</span>
         <span>
-          <strong class="block text-2xl font-black text-[#06337d]">DGA-IMO<span class="text-[#0aa25f]">360</span></strong>
-          <small class="block text-xs font-bold text-[#536484]">Votre projet, notre priorité</small>
+          <img src="{% static 'img/logoDGAmutuelle_bg_white.jpg' %}" width="150">
+
         </span>
       </a>
       <nav class="hidden items-center gap-7 text-sm font-extrabold text-[#172b5f] lg:flex">
@@ -19,8 +18,20 @@
         <a href="#securite">Sécurité</a>
       </nav>
       <div class="hidden items-center gap-3 sm:flex">
-        <a href="{% url 'login' %}" class="rounded-xl border border-[#dce7f6] bg-white px-5 py-3 text-sm font-black text-[#06337d] no-underline">Connexion</a>
-        <a href="{% url 'public-mutuelle-signup' %}" class="rounded-xl bg-[#003b98] px-5 py-3 text-sm font-black text-white no-underline shadow-lg shadow-blue-900/20">Créer une mutuelle</a>
+        {% if user.is_authenticated %}
+          <span class="hidden items-center gap-2 rounded-xl bg-[#f3f7ff] px-4 py-2 text-xs font-bold text-[#536484] md:flex">
+            <span class="grid h-7 w-7 place-items-center rounded-lg bg-[#003b98] text-xs font-black text-white">{{ user.first_name|default:user.email|slice:":1"|upper }}</span>
+            <span class="max-w-[180px] truncate">{{ user.get_full_name|default:user.email }}</span>
+          </span>
+          <a href="{% url 'dashboard-home' %}" class="rounded-xl bg-[#003b98] px-5 py-3 text-sm font-black text-white no-underline shadow-lg shadow-blue-900/20">Ma console</a>
+          <form method="post" action="{% url 'logout' %}" class="m-0">
+            {% csrf_token %}
+            <button type="submit" class="rounded-xl border border-[#dce7f6] bg-white px-4 py-3 text-sm font-black text-[#06337d]">Déconnexion</button>
+          </form>
+        {% else %}
+          <a href="{% url 'login' %}" class="rounded-xl border border-[#dce7f6] bg-white px-5 py-3 text-sm font-black text-[#06337d] no-underline">Connexion</a>
+          <a href="{% url 'public-mutuelle-signup' %}" class="rounded-xl bg-[#003b98] px-5 py-3 text-sm font-black text-white no-underline shadow-lg shadow-blue-900/20">Créer une mutuelle</a>
+        {% endif %}
       </div>
       <button type="button" class="grid h-11 w-11 place-items-center rounded-xl border border-[#dce7f6] bg-white text-xl lg:hidden" @click="open=!open">☰</button>
     </div>
@@ -30,7 +41,16 @@
         <a class="rounded-xl px-3 py-3 hover:bg-[#f3f7ff]" href="#quotite">Quotité</a>
         <a class="rounded-xl px-3 py-3 hover:bg-[#f3f7ff]" href="#projets">Projets</a>
         <a class="rounded-xl px-3 py-3 hover:bg-[#f3f7ff]" href="#plateforme">Plateforme</a>
-        <a class="rounded-xl bg-[#003b98] px-3 py-3 text-white" href="{% url 'public-mutuelle-signup' %}">Créer une mutuelle</a>
+        {% if user.is_authenticated %}
+          <a class="rounded-xl bg-[#003b98] px-3 py-3 text-white" href="{% url 'dashboard-home' %}">Ma console</a>
+          <form method="post" action="{% url 'logout' %}" class="m-0">
+            {% csrf_token %}
+            <button type="submit" class="w-full rounded-xl border border-[#dce7f6] bg-white px-3 py-3 text-left text-sm font-black text-[#06337d]">Déconnexion ({{ user.get_full_name|default:user.email }})</button>
+          </form>
+        {% else %}
+          <a class="rounded-xl border border-[#dce7f6] bg-white px-3 py-3 text-[#06337d]" href="{% url 'login' %}">Connexion</a>
+          <a class="rounded-xl bg-[#003b98] px-3 py-3 text-white" href="{% url 'public-mutuelle-signup' %}">Créer une mutuelle</a>
+        {% endif %}
       </div>
     </div>
   </header>
@@ -40,7 +60,6 @@
       <div class="absolute inset-x-0 top-0 h-[820px] bg-[linear-gradient(135deg,#f9fcff_0%,#edf5ff_48%,#ffffff_100%)]"></div>
       <div class="relative mx-auto grid max-w-[1440px] items-center gap-12 px-5 py-16 lg:grid-cols-[.9fr_1.1fr] lg:px-8 lg:py-20">
         <div>
-          <span class="inline-flex rounded-full border border-[#d7e5f8] bg-white px-4 py-2 text-xs font-black uppercase tracking-[.16em] text-[#0b55d9] shadow-sm">SaaS immobilier mutualiste</span>
           <h1 class="mt-7 max-w-3xl text-5xl font-black leading-[1.02] text-[#06194a] md:text-7xl">
             La plateforme qui transforme les mutuelles en <span class="text-[#009f5b]">puissance immobilière</span>.
           </h1>
@@ -92,7 +111,6 @@
 
     <section id="reseau" class="mx-auto max-w-[1320px] px-5 py-20 lg:px-8">
       <div class="mb-10 max-w-3xl">
-        <span class="text-xs font-black uppercase tracking-[.16em] text-[#0b55d9]">Un réseau premium</span>
         <h2 class="mt-4 text-4xl font-black leading-tight md:text-5xl">Chaque acteur avance avec la bonne information, au bon moment.</h2>
         <p class="mt-5 text-lg leading-8 text-[#536484]">Chaque membre devient un profil financier qualifié. Chaque mutuelle devient un véhicule collectif lisible par les banques, promoteurs, courtiers et comités internes.</p>
       </div>
@@ -115,7 +133,11 @@
           <span class="text-xs font-black uppercase tracking-[.16em] text-[#caff3d]">Quotité cessible</span>
           <h2 class="mt-4 text-4xl font-black leading-tight md:text-5xl">La décision ne part plus d’une intuition, mais d’une capacité réelle.</h2>
           <p class="mt-5 text-lg leading-8 text-white/70">DGA-IMO360 calcule la mensualité maximale par membre, puis consolide la capacité de toute la mutuelle pour dimensionner un programme immobilier collectif.</p>
-          <a href="{% url 'login' %}?next=/console/simulations/nouvelle/" class="mt-8 inline-flex rounded-2xl bg-[#caff3d] px-6 py-4 text-sm font-black text-[#06194a] no-underline">Lancer une simulation</a>
+          {% if user.is_authenticated %}
+            <a href="{% url 'create-simulation' %}" class="mt-8 inline-flex rounded-2xl bg-[#caff3d] px-6 py-4 text-sm font-black text-[#06194a] no-underline">Lancer une simulation</a>
+          {% else %}
+            <a href="{% url 'login' %}?next=/console/simulations/nouvelle/" class="mt-8 inline-flex rounded-2xl bg-[#caff3d] px-6 py-4 text-sm font-black text-[#06194a] no-underline">Lancer une simulation</a>
+          {% endif %}
         </div>
         <div class="grid gap-4 md:grid-cols-2">
           <div class="rounded-3xl bg-white/10 p-6"><span class="text-xs font-black uppercase text-white/50">Membre</span><b class="mt-4 block text-3xl">150 000 000 FCFA</b><p class="mt-2 text-sm font-bold text-white/70">Montant maximal estimé selon revenus, charges, crédits et reste à vivre.</p></div>
@@ -129,7 +151,11 @@
     <section id="projets" class="mx-auto max-w-[1320px] px-5 py-20 lg:px-8">
       <div class="mb-10 flex flex-wrap items-end justify-between gap-5">
         <div><span class="text-xs font-black uppercase tracking-[.16em] text-[#0b55d9]">Opportunités immobilières</span><h2 class="mt-3 text-4xl font-black">Des programmes prêts à comparer et réserver.</h2></div>
-        <a class="rounded-xl bg-[#eaf2ff] px-5 py-3 text-sm font-black text-[#0b55d9] no-underline" href="{% url 'login' %}?next=/console/projets/">Voir les projets</a>
+        {% if user.is_authenticated %}
+          <a class="rounded-xl bg-[#eaf2ff] px-5 py-3 text-sm font-black text-[#0b55d9] no-underline" href="{% url 'projects-center' %}">Voir les projets</a>
+        {% else %}
+          <a class="rounded-xl bg-[#eaf2ff] px-5 py-3 text-sm font-black text-[#0b55d9] no-underline" href="{% url 'login' %}?next=/console/projets/">Voir les projets</a>
+        {% endif %}
       </div>
       <div class="grid gap-5 md:grid-cols-3">
         <article class="overflow-hidden rounded-[32px] bg-white shadow-xl shadow-blue-950/5"><img class="h-64 w-full object-cover" src="https://images.unsplash.com/photo-1600607688969-a5bfcd646154?auto=format&fit=crop&w=900&q=85" alt="Villa"><div class="p-6"><span class="rounded-full bg-[#e8fff2] px-3 py-1 text-xs font-black text-[#0b9f5b]">Villa</span><h3 class="mt-4 text-xl font-black">Résidences familiales</h3><p class="mt-2 text-sm font-semibold leading-6 text-[#536484]">Lots adaptés aux mutuelles salariales avec apport progressif et financement mixte.</p></div></article>
@@ -138,22 +164,12 @@
       </div>
     </section>
 
-    <section id="plateforme" class="bg-[#eef5ff]">
-      <div class="mx-auto max-w-[1320px] px-5 py-20 lg:px-8">
-        <div class="mb-10 max-w-3xl"><span class="text-xs font-black uppercase tracking-[.16em] text-[#0b55d9]">Console SaaS</span><h2 class="mt-3 text-4xl font-black">Tout le cycle immobilier mutualiste dans une interface unique.</h2></div>
-        <div class="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
-          <div class="rounded-3xl bg-white p-6 shadow-sm"><b class="text-xl">Dashboard 360</b><p class="mt-3 text-sm font-semibold leading-6 text-[#536484]">KPIs, capacité collective, risques, documents et actions rapides.</p></div>
-          <div class="rounded-3xl bg-white p-6 shadow-sm"><b class="text-xl">Mobile Money</b><p class="mt-3 text-sm font-semibold leading-6 text-[#536484]">Cotisations, paiements terrain, reçus et rapprochements.</p></div>
-          <div class="rounded-3xl bg-white p-6 shadow-sm"><b class="text-xl">Mandataires terrain</b><p class="mt-3 text-sm font-semibold leading-6 text-[#536484]">Enrôlement, QR membre, collecte offline et synchronisation future.</p></div>
-          <div class="rounded-3xl bg-white p-6 shadow-sm"><b class="text-xl">Rapports banque</b><p class="mt-3 text-sm font-semibold leading-6 text-[#536484]">Notes de synthèse, rapports PDF, score mutuelle et dossiers consolidés.</p></div>
-        </div>
-      </div>
-    </section>
+
 
     <section id="securite" class="mx-auto max-w-[1320px] px-5 py-20 lg:px-8">
       <div class="grid items-center gap-10 rounded-[40px] bg-white p-8 shadow-2xl shadow-blue-950/10 lg:grid-cols-[.95fr_1.05fr] lg:p-12">
         <div>
-          <span class="text-xs font-black uppercase tracking-[.16em] text-[#0b55d9]">Production ready</span>
+
           <h2 class="mt-4 text-4xl font-black leading-tight">Sécurité, conformité et traçabilité pensées pour la finance communautaire.</h2>
           <p class="mt-5 text-lg leading-8 text-[#536484]">Multi-tenant, audit trail, permissions RBAC, journaux de connexion, MFA, segmentation par mutuelle et préparation API/mobile pour les usages terrain.</p>
         </div>
@@ -173,8 +189,13 @@
           <h2 class="mt-4 text-4xl font-black leading-tight">Créez une mutuelle immobilière pilotée par les données.</h2>
           <p class="mt-4 max-w-2xl text-lg leading-8 text-white/75">Structurez vos membres, simulez la capacité, comparez les programmes et préparez des dossiers lisibles pour les banques et comités.</p>
           <div class="mt-8 flex flex-wrap gap-4">
-            <a href="{% url 'public-mutuelle-signup' %}" class="rounded-xl bg-[#0bbf63] px-6 py-4 text-sm font-black text-white no-underline">Créer une mutuelle</a>
-            <a href="{% url 'login' %}" class="rounded-xl border border-white/30 px-6 py-4 text-sm font-black text-white no-underline">Se connecter</a>
+            {% if user.is_authenticated %}
+              <a href="{% url 'dashboard-home' %}" class="rounded-xl bg-[#0bbf63] px-6 py-4 text-sm font-black text-white no-underline">Accéder à ma console</a>
+              <a href="{% url 'create-mutuelle' %}" class="rounded-xl border border-white/30 px-6 py-4 text-sm font-black text-white no-underline">+ Créer une mutuelle</a>
+            {% else %}
+              <a href="{% url 'public-mutuelle-signup' %}" class="rounded-xl bg-[#0bbf63] px-6 py-4 text-sm font-black text-white no-underline">Créer une mutuelle</a>
+              <a href="{% url 'login' %}" class="rounded-xl border border-white/30 px-6 py-4 text-sm font-black text-white no-underline">Se connecter</a>
+            {% endif %}
           </div>
         </div>
         <img class="h-full min-h-[320px] w-full object-cover" src="https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&w=900&q=85" alt="Conseillers DGA-IMO360">

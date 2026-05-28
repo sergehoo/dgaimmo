@@ -1,146 +1,363 @@
 {% extends "dashboard/console_base.html" %}
+{% load humanize %}
 {% block console_content %}
-<p class="mb-5 text-sm font-bold text-[#536484]">Accueil › Mutuelles › Détails mutuelle</p>
+<p class="mb-5 text-sm font-bold text-[#536484]">
+  <a href="{% url 'dashboard-home' %}" class="text-[#0b55d9] no-underline">Accueil</a> ›
+  <a href="{% url 'mutuelles-list' %}" class="text-[#0b55d9] no-underline">Mutuelles</a> ›
+  <span>{{ mutuelle.name }}</span>
+</p>
 
+{# =========================================================
+   HEADER : identité de la mutuelle + actions
+   ========================================================= #}
 <section class="rounded-2xl border border-[#dfe9f8] bg-white p-7 shadow-sm">
   <div class="flex flex-wrap items-start justify-between gap-6">
     <div class="flex min-w-0 items-center gap-5">
-      <div class="grid h-20 w-20 shrink-0 place-items-center rounded-2xl text-4xl text-white" style="background: {{ mutuelle.primary_color|default:'#0b55d9' }}">♧</div>
+      <div class="grid h-20 w-20 shrink-0 place-items-center rounded-2xl text-4xl font-black text-white shadow-lg" style="background: {{ mutuelle.primary_color|default:'#0b55d9' }}">
+        {{ mutuelle.name|slice:":1"|upper }}
+      </div>
       <div class="min-w-0">
         <div class="flex flex-wrap items-center gap-3">
           <h1 class="truncate text-3xl font-black">{{ mutuelle.name }}</h1>
-          <span class="inline-flex rounded-full bg-[#e8fff2] px-3 py-1 text-xs font-black text-[#0b9f5b]">{{ score.health_level|default:"Analysée" }}</span>
+          <span class="inline-flex rounded-full bg-[#e8fff2] px-3 py-1 text-xs font-black text-[#0b9f5b]">{{ kpi_solvency_level }}</span>
+          {% if mutuelle.real_estate_objectives_labels %}
+            {% for label in mutuelle.real_estate_objectives_labels %}
+              <span class="inline-flex rounded-full bg-[#eaf2ff] px-3 py-1 text-xs font-black text-[#0b55d9]">{{ label }}</span>
+            {% endfor %}
+          {% else %}
+            <span class="inline-flex rounded-full bg-[#eaf2ff] px-3 py-1 text-xs font-black text-[#0b55d9]">Objectif à définir</span>
+          {% endif %}
         </div>
-        <p class="mt-2 text-sm font-bold text-[#536484]">{{ mutuelle.legal_name|default:"Organisation mutualiste" }} · {{ mutuelle.country }} · {{ mutuelle.currency }} · {{ mutuelle.get_status_display }}</p>
-        <p class="mt-1 text-xs font-black text-[#667899]">Créée le {{ mutuelle.created_at|date:"d/m/Y" }} · Plan {{ mutuelle.subscription_plan|default:"starter" }}</p>
+        <p class="mt-2 text-sm font-bold text-[#536484]">
+          {{ mutuelle.organization_name|default:mutuelle.legal_name|default:"Organisation mutualiste" }}
+          {% if mutuelle.organization_type %} · {{ mutuelle.get_organization_type_display }}{% endif %}
+          · {{ mutuelle.country }} · {{ mutuelle.currency }}
+          · {{ mutuelle.get_status_display }}
+        </p>
+        <p class="mt-1 text-xs font-black text-[#667899]">
+          Créée le {{ mutuelle.created_at|date:"d/m/Y" }} · Plan {{ mutuelle.subscription_plan|default:"starter" }}
+          {% if mutuelle.contact_full_name %} · Contact : {{ mutuelle.contact_full_name }}{% if mutuelle.contact_function %} ({{ mutuelle.contact_function }}){% endif %}{% endif %}
+        </p>
       </div>
     </div>
     <div class="flex flex-wrap gap-3">
       <a href="{% url 'update-mutuelle-branding' mutuelle.id %}" class="rounded-xl border border-[#dce7f6] bg-white px-4 py-3 text-sm font-black text-[#0b55d9] no-underline">Branding</a>
       <a href="{% url 'mutuelle-report-pdf' mutuelle.id %}" class="rounded-xl border border-[#dce7f6] bg-white px-4 py-3 text-sm font-black text-[#0b55d9] no-underline">Rapport PDF</a>
-      <a href="{% url 'create-member' %}" class="rounded-xl px-4 py-3 text-sm font-black text-white no-underline" style="background: var(--tenant-primary)">+ Membre</a>
+      <a href="{% url 'create-member' %}" class="rounded-xl px-4 py-3 text-sm font-black text-white no-underline shadow-lg shadow-blue-900/20" style="background: {{ mutuelle.primary_color|default:'#0b55d9' }}">+ Nouveau membre</a>
     </div>
-  </div>
-
-  <div class="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
-    <div class="rounded-xl bg-[#f7faff] p-4"><b class="text-2xl">{{ members_total|intcomma }}</b><span class="block text-xs font-bold text-[#536484]">Membres</span></div>
-    <div class="rounded-xl bg-[#f7faff] p-4"><b class="text-2xl">{{ members_kyc_validated|intcomma }}</b><span class="block text-xs font-bold text-[#536484]">KYC validés</span></div>
-    <div class="rounded-xl bg-[#f7faff] p-4"><b class="text-2xl">{{ treasury_balance|floatformat:0|intcomma }}</b><span class="block text-xs font-bold text-[#536484]">Trésorerie</span></div>
-    <div class="rounded-xl bg-[#f7faff] p-4"><b class="text-2xl">{{ collective_capacity|floatformat:0|intcomma }}</b><span class="block text-xs font-bold text-[#536484]">Capacité</span></div>
-    <div class="rounded-xl bg-[#f7faff] p-4"><b class="text-2xl">{{ programs_count|intcomma }}</b><span class="block text-xs font-bold text-[#536484]">Programmes</span></div>
-    <div class="rounded-xl bg-[#f7faff] p-4"><b class="text-2xl">{{ reservations_count|intcomma }}</b><span class="block text-xs font-bold text-[#536484]">Réservations</span></div>
   </div>
 </section>
 
-<section class="mt-6 grid gap-6 xl:grid-cols-[1.1fr_.9fr]">
-  <article class="rounded-2xl border border-[#e5edf8] bg-white p-7 shadow-sm">
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <h2 class="text-xl font-black">Quotité cessible & solvabilité</h2>
-      <a href="{% url 'create-simulation' %}" class="rounded-xl bg-[#eaf2ff] px-4 py-2 text-xs font-black text-[#0b55d9] no-underline">Lancer une simulation</a>
+{# =========================================================
+   4 KPI PRINCIPAUX
+   ========================================================= #}
+<section class="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+  {# KPI 1 — Nombre de membres #}
+  <article class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm">
+    <div class="flex items-start justify-between">
+      <span class="grid h-12 w-12 place-items-center rounded-xl bg-[#eaf2ff] text-2xl">👥</span>
+      <span class="rounded-full bg-[#e8fff2] px-3 py-1 text-xs font-black text-[#0b9f5b]">{{ members_active|intcomma }} actifs</span>
     </div>
-    <div class="mt-6 grid gap-4 md:grid-cols-5">
-      <div class="rounded-2xl bg-[#071d54] p-5 text-white"><span class="text-xs font-black uppercase text-white/60">Mensualité cumulée</span><b class="mt-3 block text-2xl">{{ quotite_mutuelle_monthly_capacity|floatformat:0|intcomma }}</b></div>
-      <div class="rounded-2xl bg-[#f7faff] p-5"><span class="text-xs font-black uppercase text-[#536484]">Finançable</span><b class="mt-3 block text-2xl">{{ quotite_mutuelle_financeable_amount|floatformat:0|intcomma }}</b></div>
-      <div class="rounded-2xl bg-[#f7faff] p-5"><span class="text-xs font-black uppercase text-[#536484]">Éligibles</span><b class="mt-3 block text-2xl text-[#0b9f5b]">{{ simulations_eligible|intcomma }}</b></div>
-      <div class="rounded-2xl bg-[#f7faff] p-5"><span class="text-xs font-black uppercase text-[#536484]">Taux moyen</span><b class="mt-3 block text-2xl">{{ quotite_mutuelle_avg_debt_ratio }}%</b></div>
-      <div class="rounded-2xl bg-[#eef4ff] p-5"><span class="text-xs font-black uppercase text-[#536484]">Amortissement moyen</span><b class="mt-3 block text-2xl">{{ quotite_mutuelle_avg_amortization_months|intcomma }} mois</b></div>
+    <p class="mt-5 text-xs font-black uppercase tracking-wider text-[#667899]">Nombre de membres</p>
+    <b class="mt-2 block text-4xl font-black text-[#06194a]">{{ kpi_members_count|intcomma }}</b>
+    <small class="mt-3 block text-xs font-bold text-[#536484]">{{ members_kyc_validated|intcomma }} KYC validés · {{ mutuelle.estimated_members_count|intcomma|default:0 }} estimés</small>
+  </article>
+
+  {# KPI 2 — Capacité d'emprunt totale #}
+  <article class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm">
+    <div class="flex items-start justify-between">
+      <span class="grid h-12 w-12 place-items-center rounded-xl bg-[#fff4e5] text-2xl">💰</span>
+      <span class="rounded-full bg-[#fff7df] px-3 py-1 text-xs font-black text-[#b56a00]">{{ mutuelle.currency }}</span>
     </div>
-    <div class="mt-6 overflow-x-auto">
-      <table class="w-full min-w-[720px] text-left text-sm">
-        <thead class="bg-[#f8fbff] text-xs font-black uppercase text-[#667899]"><tr><th class="rounded-l-xl px-4 py-3">Membre</th><th class="px-4 py-3">Mensualité max</th><th class="px-4 py-3">Finançable</th><th class="px-4 py-3">Période d'amortissement</th><th class="px-4 py-3">Endettement</th><th class="rounded-r-xl px-4 py-3">Décision</th></tr></thead>
+    <p class="mt-5 text-xs font-black uppercase tracking-wider text-[#667899]">Capacité d'emprunt totale</p>
+    <b class="mt-2 block text-3xl font-black text-[#06194a]">{{ kpi_borrowing_capacity|floatformat:0|intcomma }}</b>
+    <small class="mt-3 block text-xs font-bold text-[#536484]">Mensualité cumulée des membres simulés</small>
+  </article>
+
+  {# KPI 3 — Score de solvabilité global #}
+  <article class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm">
+    <div class="flex items-start justify-between">
+      <span class="grid h-12 w-12 place-items-center rounded-xl bg-[#ede9fe] text-2xl">📊</span>
+      <span class="rounded-full bg-[#ede9fe] px-3 py-1 text-xs font-black text-[#7c3aed]">/100</span>
+    </div>
+    <p class="mt-5 text-xs font-black uppercase tracking-wider text-[#667899]">Score de solvabilité global</p>
+    <b class="mt-2 block text-4xl font-black text-[#06194a]">{{ kpi_solvency_score|floatformat:0 }}</b>
+    <div class="mt-3 h-2 w-full rounded-full bg-[#eef3fb]">
+      <div class="h-2 rounded-full bg-gradient-to-r from-[#0b55d9] to-[#0aa25f]" style="width:{{ kpi_solvency_score|floatformat:0 }}%"></div>
+    </div>
+    <small class="mt-3 block text-xs font-bold text-[#536484]">{{ kpi_solvency_level }}</small>
+  </article>
+
+  {# KPI 4 — Budget estimé du projet possible #}
+  <article class="rounded-2xl bg-gradient-to-br from-[#06194a] to-[#003b98] p-6 text-white shadow-2xl shadow-blue-950/20">
+    <div class="flex items-start justify-between">
+      <span class="grid h-12 w-12 place-items-center rounded-xl bg-white/15 text-2xl">🏗️</span>
+      <span class="rounded-full bg-white/15 px-3 py-1 text-xs font-black text-[#cfff3d]">{{ mutuelle.real_estate_objectives_display|default:"Projet" }}</span>
+    </div>
+    <p class="mt-5 text-xs font-black uppercase tracking-wider text-white/70">Budget estimé du projet possible</p>
+    <b class="mt-2 block text-3xl font-black text-white">{{ kpi_project_budget|floatformat:0|intcomma }}</b>
+    <small class="mt-3 block text-xs font-bold text-white/70">{{ mutuelle.currency }} · Financement collectif maximum</small>
+  </article>
+</section>
+
+{# =========================================================
+   NAVIGATION ONGLETS (5 SECTIONS)
+   ========================================================= #}
+<section class="mt-7" x-data="{ tab: 'members' }">
+  <div class="flex flex-wrap gap-2 rounded-2xl border border-[#e5edf8] bg-white p-2 shadow-sm">
+    <button type="button" @click="tab='members'"
+            :class="tab === 'members' ? 'bg-[#0b55d9] text-white shadow-md' : 'bg-transparent text-[#06194a] hover:bg-[#f3f7ff]'"
+            class="flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-black transition">
+      <span>👥</span> Membres <span class="rounded-full bg-white/20 px-2 py-0.5 text-xs">{{ members_total|intcomma }}</span>
+    </button>
+    <button type="button" @click="tab='analytics'"
+            :class="tab === 'analytics' ? 'bg-[#0b55d9] text-white shadow-md' : 'bg-transparent text-[#06194a] hover:bg-[#f3f7ff]'"
+            class="flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-black transition">
+      <span>📈</span> Analyse financière
+    </button>
+    <button type="button" @click="tab='projects'"
+            :class="tab === 'projects' ? 'bg-[#0b55d9] text-white shadow-md' : 'bg-transparent text-[#06194a] hover:bg-[#f3f7ff]'"
+            class="flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-black transition">
+      <span>🏗️</span> Projets proposés <span class="rounded-full bg-white/20 px-2 py-0.5 text-xs">{{ programs_count|intcomma }}</span>
+    </button>
+    <button type="button" @click="tab='payments'"
+            :class="tab === 'payments' ? 'bg-[#0b55d9] text-white shadow-md' : 'bg-transparent text-[#06194a] hover:bg-[#f3f7ff]'"
+            class="flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-black transition">
+      <span>💳</span> Suivi des paiements
+    </button>
+    <button type="button" @click="tab='documents'"
+            :class="tab === 'documents' ? 'bg-[#0b55d9] text-white shadow-md' : 'bg-transparent text-[#06194a] hover:bg-[#f3f7ff]'"
+            class="flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-black transition">
+      <span>📁</span> Documents <span class="rounded-full bg-white/20 px-2 py-0.5 text-xs">{{ documents_total|intcomma }}</span>
+    </button>
+  </div>
+
+  {# ---------- SECTION 1 : MEMBRES ---------- #}
+  <article x-show="tab==='members'" x-transition.opacity class="mt-6 rounded-2xl border border-[#e5edf8] bg-white p-7 shadow-sm">
+    <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h2 class="text-xl font-black">Liste des membres</h2>
+        <p class="mt-1 text-sm font-bold text-[#536484]">{{ members_total|intcomma }} membre(s) · {{ members_kyc_validated|intcomma }} KYC validés · {{ members_delinquent|intcomma }} en retard</p>
+      </div>
+      <div class="flex gap-2">
+        <a href="{% url 'members-center' %}" class="rounded-xl bg-[#eaf2ff] px-4 py-2 text-xs font-black text-[#0b55d9] no-underline">Tous les membres</a>
+        <a href="{% url 'create-member' %}" class="rounded-xl bg-[#0b55d9] px-4 py-2 text-xs font-black text-white no-underline">+ Ajouter</a>
+      </div>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full min-w-[840px] text-left text-sm">
+        <thead class="bg-[#f8fbff] text-xs font-black uppercase text-[#667899]">
+          <tr>
+            <th class="rounded-l-xl px-4 py-3">Membre</th>
+            <th class="px-4 py-3">Code</th>
+            <th class="px-4 py-3">Fonction</th>
+            <th class="px-4 py-3">Banque</th>
+            <th class="px-4 py-3">Statut</th>
+            <th class="rounded-r-xl px-4 py-3">KYC</th>
+          </tr>
+        </thead>
         <tbody class="divide-y divide-[#edf2fb]">
-          {% for row in quotite_members_rows|slice:":6" %}
-          <tr class="font-bold"><td class="px-4 py-4">{{ row.member.first_name }} {{ row.member.last_name }}</td><td>{{ row.max_authorized_payment|floatformat:0|intcomma }} FCFA</td><td>{{ row.financeable_amount|floatformat:0|intcomma }} FCFA</td><td>{% if row.amortization_months %}{{ row.amortization_months|intcomma }} mois{% else %}À simuler{% endif %}</td><td>{{ row.debt_ratio|floatformat:0 }}%</td><td>{{ row.decision }}</td></tr>
+          {% for member in members %}
+          <tr class="font-bold">
+            <td class="px-4 py-4">
+              <div class="flex items-center gap-3">
+                <span class="grid h-9 w-9 flex-none place-items-center rounded-xl bg-[#eef4ff] text-xs font-black text-[#0b55d9]">{{ member.first_name|slice:":1" }}{{ member.last_name|slice:":1" }}</span>
+                <div>
+                  <b>{{ member.last_name|upper }} {{ member.first_name }}</b>
+                  <small class="block text-xs font-bold text-[#536484]">{{ member.phone }}{% if member.email %} · {{ member.email }}{% endif %}</small>
+                </div>
+              </div>
+            </td>
+            <td class="px-4 py-4 font-mono text-xs">{{ member.member_code }}</td>
+            <td class="px-4 py-4">{{ member.job_function|default:"—" }}<small class="block text-xs font-bold text-[#536484]">{{ member.employer|default:"" }}</small></td>
+            <td class="px-4 py-4">{% if member.bank %}{{ member.bank.name }}{% else %}<span class="text-[#b56a00]">À renseigner</span>{% endif %}</td>
+            <td class="px-4 py-4">
+              <span class="rounded-full px-3 py-1 text-xs font-black {% if member.status == 'active' %}bg-[#e8fff2] text-[#0b9f5b]{% elif member.status == 'delinquent' %}bg-[#fff4e5] text-[#b56a00]{% elif member.status == 'suspended' %}bg-red-50 text-red-700{% else %}bg-[#eaf2ff] text-[#0b55d9]{% endif %}">
+                {{ member.get_status_display }}
+              </span>
+            </td>
+            <td class="px-4 py-4">{% if member.kyc_validated %}<span class="text-[#0b9f5b]">✓ Validé</span>{% else %}<span class="text-[#b56a00]">En attente</span>{% endif %}</td>
+          </tr>
           {% empty %}
-          <tr><td class="px-4 py-5 text-[#667899]">Aucune simulation disponible.</td></tr>
+          <tr><td colspan="6" class="px-4 py-8 text-center text-sm font-bold text-[#667899]">Aucun membre. <a href="{% url 'create-member' %}" class="text-[#0b55d9]">Ajouter le premier membre →</a></td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
   </article>
 
-  <aside class="rounded-2xl border border-[#e5edf8] bg-white p-7 shadow-sm">
-    <h2 class="text-xl font-black">Actions rapides</h2>
-    <div class="mt-5 grid gap-3">
-      <a href="{% url 'create-member' %}" class="rounded-xl bg-[#eaf2ff] px-4 py-3 text-sm font-black text-[#0b55d9] no-underline">Ajouter un membre</a>
-      <a href="{% url 'create-financial-profile' %}" class="rounded-xl bg-[#eaf2ff] px-4 py-3 text-sm font-black text-[#0b55d9] no-underline">Créer un profil financier</a>
-      <a href="{% url 'create-simulation' %}" class="rounded-xl bg-[#eaf2ff] px-4 py-3 text-sm font-black text-[#0b55d9] no-underline">Simuler la quotité cessible</a>
-      <a href="{% url 'create-project' %}" class="rounded-xl bg-[#eaf2ff] px-4 py-3 text-sm font-black text-[#0b55d9] no-underline">Créer un projet immobilier</a>
-      <a href="{% url 'create-contribution' %}" class="rounded-xl bg-[#eaf2ff] px-4 py-3 text-sm font-black text-[#0b55d9] no-underline">Générer une cotisation</a>
-      <a href="{% url 'mutuelle-report' mutuelle.id %}" class="rounded-xl bg-[#06194a] px-4 py-3 text-sm font-black text-white no-underline">Voir le rapport complet</a>
+  {# ---------- SECTION 2 : ANALYSE FINANCIÈRE ---------- #}
+  <article x-show="tab==='analytics'" x-transition.opacity class="mt-6 grid gap-6 xl:grid-cols-[1.2fr_.8fr]">
+    <div class="rounded-2xl border border-[#e5edf8] bg-white p-7 shadow-sm">
+      <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <h2 class="text-xl font-black">Quotité cessible & solvabilité</h2>
+        <a href="{% url 'create-simulation' %}" class="rounded-xl bg-[#eaf2ff] px-4 py-2 text-xs font-black text-[#0b55d9] no-underline">+ Lancer une simulation</a>
+      </div>
+      <div class="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
+        <div class="rounded-2xl bg-[#071d54] p-5 text-white"><span class="text-xs font-black uppercase text-white/60">Mensualité cumulée</span><b class="mt-2 block text-xl">{{ quotite_mutuelle_monthly_capacity|floatformat:0|intcomma }}</b></div>
+        <div class="rounded-2xl bg-[#f7faff] p-5"><span class="text-xs font-black uppercase text-[#536484]">Finançable</span><b class="mt-2 block text-xl">{{ quotite_mutuelle_financeable_amount|floatformat:0|intcomma }}</b></div>
+        <div class="rounded-2xl bg-[#e8fff2] p-5"><span class="text-xs font-black uppercase text-[#0b9f5b]">Éligibles</span><b class="mt-2 block text-xl">{{ simulations_eligible|intcomma }}</b></div>
+        <div class="rounded-2xl bg-[#fff4e5] p-5"><span class="text-xs font-black uppercase text-[#b56a00]">Taux endettement</span><b class="mt-2 block text-xl">{{ quotite_mutuelle_avg_debt_ratio }}%</b></div>
+      </div>
+      <div class="mt-6 overflow-x-auto">
+        <table class="w-full min-w-[640px] text-left text-sm">
+          <thead class="bg-[#f8fbff] text-xs font-black uppercase text-[#667899]">
+            <tr><th class="rounded-l-xl px-4 py-3">Membre</th><th class="px-4 py-3">Mensualité max</th><th class="px-4 py-3">Finançable</th><th class="rounded-r-xl px-4 py-3">Décision</th></tr>
+          </thead>
+          <tbody class="divide-y divide-[#edf2fb]">
+            {% for row in quotite_members_rows|slice:":8" %}
+            <tr class="font-bold"><td class="px-4 py-3">{{ row.member.last_name|upper }} {{ row.member.first_name }}</td><td>{{ row.max_authorized_payment|floatformat:0|intcomma }} {{ mutuelle.currency }}</td><td>{{ row.financeable_amount|floatformat:0|intcomma }} {{ mutuelle.currency }}</td><td>{{ row.decision }}</td></tr>
+            {% empty %}
+            <tr><td colspan="4" class="px-4 py-6 text-center text-[#667899]">Aucune simulation disponible.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
-  </aside>
-</section>
 
-<section class="mt-6 rounded-2xl border border-[#e5edf8] bg-white p-7 shadow-sm">
-  <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
-    <div>
-      <h2 class="text-xl font-black">Résumé financier</h2>
-      <p class="mt-1 text-sm font-bold text-[#536484]">Vue consolidée des cotisations, paiements, prestations et dossiers immobiliers de cette mutuelle.</p>
+    <div class="grid gap-4">
+      <div class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm">
+        <h3 class="text-base font-black">Trésorerie & cotisations</h3>
+        <div class="mt-5 grid gap-3">
+          <div class="rounded-xl bg-[#f7faff] p-4"><small class="text-xs font-black uppercase text-[#536484]">Trésorerie disponible</small><b class="mt-1 block text-2xl">{{ treasury_balance|floatformat:0|intcomma }} {{ mutuelle.currency }}</b></div>
+          <div class="rounded-xl bg-[#e8fff2] p-4"><small class="text-xs font-black uppercase text-[#0b9f5b]">Cotisations encaissées</small><b class="mt-1 block text-2xl">{{ contributions_paid_total|floatformat:0|intcomma }} {{ mutuelle.currency }}</b></div>
+          <div class="rounded-xl bg-[#fff4e5] p-4"><small class="text-xs font-black uppercase text-[#b56a00]">Échéances dues</small><b class="mt-1 block text-2xl">{{ contributions_due_count|intcomma }}</b><span class="text-xs font-bold text-[#b56a00]">dont {{ contributions_overdue_count }} en retard</span></div>
+        </div>
+      </div>
+      <div class="rounded-2xl bg-[#06194a] p-6 text-white shadow-xl shadow-blue-950/15">
+        <h3 class="text-base font-black text-[#cfff3d]">Synthèse simulations</h3>
+        <div class="mt-5 grid gap-2 text-sm">
+          <p class="flex items-center justify-between"><span>Éligibles</span><b class="text-[#cfff3d]">{{ simulations_eligible|intcomma }}</b></p>
+          <p class="flex items-center justify-between"><span>Sous réserve</span><b>{{ simulations_conditional|intcomma }}</b></p>
+          <p class="flex items-center justify-between"><span>Non éligibles</span><b class="text-red-300">{{ simulations_rejected|intcomma }}</b></p>
+          <p class="flex items-center justify-between border-t border-white/15 pt-3"><span>Total simulations</span><b>{{ simulations_total|intcomma }}</b></p>
+        </div>
+      </div>
     </div>
-    <a href="{% url 'finance-center' %}" class="rounded-xl bg-[#eaf2ff] px-4 py-2 text-xs font-black text-[#0b55d9] no-underline">Ouvrir finances</a>
-  </div>
-  <div class="grid gap-6 xl:grid-cols-4">
-    <article class="rounded-2xl border border-[#e5edf8] bg-[#f7faff] p-6"><b class="text-3xl">{{ contributions_paid_total|floatformat:0|intcomma }}</b><p class="mt-2 font-bold text-[#536484]">Cotisations encaissées</p><small class="font-bold text-[#b56a00]">{{ contributions_due_count|intcomma }} échéances à suivre</small></article>
-    <article class="rounded-2xl border border-[#e5edf8] bg-[#f7faff] p-6"><b class="text-3xl">{{ payments_success_total|floatformat:0|intcomma }}</b><p class="mt-2 font-bold text-[#536484]">Paiements confirmés</p><small class="font-bold text-[#b56a00]">{{ payments_pending_count|intcomma }} en attente</small></article>
-    <article class="rounded-2xl border border-[#e5edf8] bg-[#f7faff] p-6"><b class="text-3xl">{{ claims_open_count|intcomma }}</b><p class="mt-2 font-bold text-[#536484]">Prestations ouvertes</p><small class="font-bold text-[#0b9f5b]">{{ claims_paid_total|floatformat:0|intcomma }} FCFA payés</small></article>
-    <article class="rounded-2xl bg-[#06194a] p-6 text-white shadow-2xl shadow-blue-950/15"><b class="text-3xl">{{ mortgage_applications_count|intcomma }}</b><p class="mt-2 font-bold text-white/70">Dossiers financement</p><small class="font-bold text-[#cfff3d]">{{ mortgage_approved_count|intcomma }} approuvés</small></article>
-  </div>
-</section>
+  </article>
 
-<section class="mt-6 grid gap-6 xl:grid-cols-[1fr_.9fr]">
-  <article class="rounded-2xl border border-[#e5edf8] bg-white p-7 shadow-sm">
-    <div class="mb-5 flex items-center justify-between gap-3"><h2 class="font-black">Programmes & opportunités</h2><a href="{% url 'projects-center' %}" class="text-sm font-black text-[#0b55d9]">Voir projets</a></div>
-    <div class="grid gap-4 md:grid-cols-2">
+  {# ---------- SECTION 3 : PROJETS PROPOSÉS ---------- #}
+  <article x-show="tab==='projects'" x-transition.opacity class="mt-6 rounded-2xl border border-[#e5edf8] bg-white p-7 shadow-sm">
+    <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h2 class="text-xl font-black">Projets & opportunités immobilières</h2>
+        <p class="mt-1 text-sm font-bold text-[#536484]">{{ programs_count|intcomma }} programmes · {{ available_lots|intcomma }} lots disponibles · {{ approved_reservations|intcomma }} réservations approuvées</p>
+      </div>
+      <a href="{% url 'create-project' %}" class="rounded-xl bg-[#0b55d9] px-4 py-2 text-xs font-black text-white no-underline">+ Nouveau projet</a>
+    </div>
+    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       {% for opportunity in opportunities %}
-      <div class="rounded-2xl bg-[#f7faff] p-5">
-        <span class="rounded-full bg-white px-3 py-1 text-xs font-black text-[#0b55d9]">{{ opportunity.get_property_type_display }}</span>
-        <h3 class="mt-4 font-black">{{ opportunity.title }}</h3>
-        <p class="mt-2 text-sm font-bold text-[#536484]">{{ opportunity.program.name }} · {{ opportunity.amount|floatformat:0|intcomma }} {{ opportunity.currency }}</p>
-        <p class="mt-3 text-xs font-black text-[#667899]">{{ opportunity.available_lots|intcomma }} lots · score {{ opportunity.score|floatformat:0 }}/100</p>
+      <div class="rounded-2xl bg-[#f7faff] p-5 transition hover:shadow-md">
+        <div class="flex items-start justify-between">
+          <span class="rounded-full bg-white px-3 py-1 text-xs font-black text-[#0b55d9]">{{ opportunity.get_property_type_display }}</span>
+          {% if opportunity.score %}<span class="text-xs font-black text-[#0b9f5b]">Score {{ opportunity.score|floatformat:0 }}/100</span>{% endif %}
+        </div>
+        <h3 class="mt-4 text-base font-black">{{ opportunity.title }}</h3>
+        <p class="mt-2 text-sm font-bold text-[#536484]">{{ opportunity.program.name }}</p>
+        <p class="mt-3 text-2xl font-black text-[#06194a]">{{ opportunity.amount|floatformat:0|intcomma }} <small class="text-sm font-bold text-[#536484]">{{ opportunity.currency }}</small></p>
+        <div class="mt-4 grid grid-cols-2 gap-2 text-xs">
+          <p class="rounded-lg bg-white p-2"><b class="block">{{ opportunity.available_lots|intcomma }}</b><span class="text-[#536484]">Lots dispos</span></p>
+          <p class="rounded-lg bg-white p-2"><b class="block">{{ opportunity.financing_months|intcomma }} mois</b><span class="text-[#536484]">Financement</span></p>
+        </div>
       </div>
       {% empty %}
-      <p class="text-sm font-bold text-[#667899]">Aucune opportunité enregistrée.</p>
+      <p class="col-span-full rounded-xl bg-[#f7faff] p-8 text-center text-sm font-bold text-[#667899]">Aucune opportunité enregistrée. <a href="{% url 'create-project' %}" class="text-[#0b55d9]">Créer le premier projet →</a></p>
       {% endfor %}
     </div>
   </article>
 
-  <article class="rounded-2xl border border-[#e5edf8] bg-white p-7 shadow-sm">
-    <h2 class="font-black">Contrôle documentaire</h2>
-    <div class="mt-5 grid gap-4">
-      <div class="rounded-2xl bg-[#f7faff] p-5"><span class="text-xs font-black uppercase text-[#536484]">Documents</span><b class="mt-2 block text-2xl">{{ documents_total|intcomma }}</b></div>
-      <div class="rounded-2xl bg-[#f7faff] p-5"><span class="text-xs font-black uppercase text-[#536484]">Validés</span><b class="mt-2 block text-2xl text-[#0b9f5b]">{{ documents_verified|intcomma }}</b></div>
-      <div class="rounded-2xl bg-[#fff7df] p-5"><span class="text-xs font-black uppercase text-[#8a6115]">À revoir</span><b class="mt-2 block text-2xl text-[#b56a00]">{{ documents_pending|intcomma }}</b></div>
+  {# ---------- SECTION 4 : SUIVI DES PAIEMENTS ---------- #}
+  <article x-show="tab==='payments'" x-transition.opacity class="mt-6 grid gap-6 xl:grid-cols-[1fr_1fr]">
+    <div class="rounded-2xl border border-[#e5edf8] bg-white p-7 shadow-sm">
+      <div class="mb-5 flex items-center justify-between">
+        <h2 class="text-xl font-black">Paiements Mobile Money</h2>
+        <a href="{% url 'create-payment' %}" class="rounded-xl bg-[#eaf2ff] px-3 py-2 text-xs font-black text-[#0b55d9] no-underline">+ Initier</a>
+      </div>
+      <div class="grid gap-3 sm:grid-cols-3">
+        <div class="rounded-xl bg-[#e8fff2] p-4"><small class="text-xs font-black uppercase text-[#0b9f5b]">Encaissé</small><b class="mt-1 block text-lg">{{ payments_success_total|floatformat:0|intcomma }}</b></div>
+        <div class="rounded-xl bg-[#fff4e5] p-4"><small class="text-xs font-black uppercase text-[#b56a00]">En attente</small><b class="mt-1 block text-lg">{{ payments_pending_count|intcomma }}</b></div>
+        <div class="rounded-xl bg-red-50 p-4"><small class="text-xs font-black uppercase text-red-700">Échoués</small><b class="mt-1 block text-lg">{{ payments_failed_count|intcomma }}</b></div>
+      </div>
+      <h3 class="mt-6 mb-3 text-sm font-black uppercase text-[#667899]">Derniers paiements</h3>
+      <div class="grid gap-2">
+        {% for payment in recent_payments %}
+        <div class="flex items-center justify-between rounded-xl bg-[#f7faff] p-4">
+          <div>
+            <b>{{ payment.member.last_name|upper|default:"—" }} {{ payment.member.first_name|default:"" }}</b>
+            <small class="block text-xs font-bold text-[#536484]">{{ payment.created_at|date:"d/m/Y H:i" }} · {{ payment.get_status_display }}</small>
+          </div>
+          <b class="text-base">{{ payment.amount|floatformat:0|intcomma }} {{ payment.currency|default:mutuelle.currency }}</b>
+        </div>
+        {% empty %}<p class="rounded-xl bg-[#f7faff] p-6 text-center text-sm font-bold text-[#667899]">Aucun paiement.</p>{% endfor %}
+      </div>
+    </div>
+
+    <div class="rounded-2xl border border-[#e5edf8] bg-white p-7 shadow-sm">
+      <div class="mb-5 flex items-center justify-between">
+        <h2 class="text-xl font-black">Cotisations récentes</h2>
+        <a href="{% url 'create-contribution' %}" class="rounded-xl bg-[#eaf2ff] px-3 py-2 text-xs font-black text-[#0b55d9] no-underline">+ Générer</a>
+      </div>
+      <div class="grid gap-2">
+        {% for c in recent_contributions %}
+        <div class="flex items-center justify-between rounded-xl bg-[#f7faff] p-4">
+          <div>
+            <b>{{ c.member.last_name|upper }} {{ c.member.first_name }}</b>
+            <small class="block text-xs font-bold text-[#536484]">{{ c.created_at|date:"d/m/Y" }} · {{ c.get_status_display }}</small>
+          </div>
+          <b class="text-base">{{ c.amount|floatformat:0|intcomma }} {{ c.currency }}</b>
+        </div>
+        {% empty %}<p class="rounded-xl bg-[#f7faff] p-6 text-center text-sm font-bold text-[#667899]">Aucune cotisation.</p>{% endfor %}
+      </div>
+    </div>
+  </article>
+
+  {# ---------- SECTION 5 : DOCUMENTS ---------- #}
+  <article x-show="tab==='documents'" x-transition.opacity class="mt-6 rounded-2xl border border-[#e5edf8] bg-white p-7 shadow-sm">
+    <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h2 class="text-xl font-black">Documents du dossier</h2>
+        <p class="mt-1 text-sm font-bold text-[#536484]">{{ documents_total|intcomma }} document(s) · {{ documents_verified|intcomma }} validés · {{ documents_pending|intcomma }} à revoir</p>
+      </div>
+      <a href="{% url 'upload-property-document' %}" class="rounded-xl bg-[#0b55d9] px-4 py-2 text-xs font-black text-white no-underline">+ Importer un document</a>
+    </div>
+    <div class="grid gap-4 md:grid-cols-3">
+      <div class="rounded-2xl bg-[#f7faff] p-5"><small class="text-xs font-black uppercase text-[#536484]">Total</small><b class="mt-2 block text-3xl">{{ documents_total|intcomma }}</b></div>
+      <div class="rounded-2xl bg-[#e8fff2] p-5"><small class="text-xs font-black uppercase text-[#0b9f5b]">Validés</small><b class="mt-2 block text-3xl text-[#0b9f5b]">{{ documents_verified|intcomma }}</b></div>
+      <div class="rounded-2xl bg-[#fff7df] p-5"><small class="text-xs font-black uppercase text-[#8a6115]">À revoir</small><b class="mt-2 block text-3xl text-[#b56a00]">{{ documents_pending|intcomma }}</b></div>
+    </div>
+    <h3 class="mb-3 mt-6 text-sm font-black uppercase text-[#667899]">Derniers documents</h3>
+    <div class="grid gap-2">
+      {% for doc in recent_documents %}
+      <div class="flex items-center justify-between rounded-xl bg-[#f7faff] p-4">
+        <div class="min-w-0">
+          <b class="block truncate">{{ doc.title|default:doc.document_type|default:"Document" }}</b>
+          <small class="block text-xs font-bold text-[#536484]">{{ doc.created_at|date:"d/m/Y H:i" }}{% if doc.document_type %} · {{ doc.document_type }}{% endif %}</small>
+        </div>
+        {% if doc.verified %}
+          <span class="rounded-full bg-[#e8fff2] px-3 py-1 text-xs font-black text-[#0b9f5b]">✓ Validé</span>
+        {% else %}
+          <span class="rounded-full bg-[#fff7df] px-3 py-1 text-xs font-black text-[#b56a00]">À revoir</span>
+        {% endif %}
+      </div>
+      {% empty %}
+      <p class="rounded-xl bg-[#f7faff] p-8 text-center text-sm font-bold text-[#667899]">Aucun document importé. <a href="{% url 'upload-property-document' %}" class="text-[#0b55d9]">Importer le premier document →</a></p>
+      {% endfor %}
     </div>
   </article>
 </section>
 
-<section class="mt-6 grid gap-6 xl:grid-cols-3">
-  <article class="rounded-2xl border border-[#e5edf8] bg-white p-7 shadow-sm">
-    <h2 class="mb-5 font-black">Membres récents</h2>
-    <div class="grid gap-3">
-      {% for member in members %}
-      <div class="rounded-xl bg-[#f7faff] p-4"><b>{{ member.first_name }} {{ member.last_name }}</b><span class="mt-1 block text-sm font-bold text-[#536484]">{{ member.member_code }} · {{ member.phone }} · {% if member.kyc_validated %}KYC validé{% else %}KYC à compléter{% endif %}</span></div>
-      {% empty %}<p class="text-sm font-bold text-[#667899]">Aucun membre.</p>{% endfor %}
-    </div>
-  </article>
-
-  <article class="rounded-2xl border border-[#e5edf8] bg-white p-7 shadow-sm">
-    <h2 class="mb-5 font-black">Cotisations & paiements</h2>
-    <div class="grid gap-3">
-      {% for contribution in recent_contributions %}
-      <div class="rounded-xl bg-[#f7faff] p-4"><b>{{ contribution.member.first_name }} {{ contribution.member.last_name }}</b><span class="mt-1 block text-sm font-bold text-[#536484]">{{ contribution.amount|floatformat:0|intcomma }} {{ contribution.currency }} · {{ contribution.get_status_display }}</span></div>
-      {% empty %}<p class="text-sm font-bold text-[#667899]">Aucune cotisation récente.</p>{% endfor %}
-    </div>
-  </article>
-
-  <article class="rounded-2xl border border-[#e5edf8] bg-white p-7 shadow-sm">
-    <h2 class="mb-5 font-black">Prestations & financement</h2>
-    <div class="grid gap-3">
-      {% for claim in recent_claims %}
-      <div class="rounded-xl bg-[#fffaf0] p-4"><b>{{ claim.get_claim_type_display }}</b><span class="mt-1 block text-sm font-bold text-[#8a6115]">{{ claim.member.first_name }} {{ claim.member.last_name }} · {{ claim.amount|floatformat:0|intcomma }} {{ claim.currency }}</span></div>
-      {% empty %}<p class="text-sm font-bold text-[#667899]">Aucune demande récente.</p>{% endfor %}
-    </div>
-  </article>
+{# =========================================================
+   FOOTER : Actions rapides
+   ========================================================= #}
+<section class="mt-7 rounded-2xl border border-[#e5edf8] bg-white p-7 shadow-sm">
+  <h2 class="text-xl font-black">Actions rapides</h2>
+  <div class="mt-5 grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+    <a href="{% url 'create-member' %}" class="rounded-xl bg-[#eaf2ff] px-4 py-3 text-sm font-black text-[#0b55d9] no-underline">+ Membre</a>
+    <a href="{% url 'create-financial-profile' %}" class="rounded-xl bg-[#eaf2ff] px-4 py-3 text-sm font-black text-[#0b55d9] no-underline">+ Profil financier</a>
+    <a href="{% url 'create-simulation' %}" class="rounded-xl bg-[#eaf2ff] px-4 py-3 text-sm font-black text-[#0b55d9] no-underline">+ Simulation</a>
+    <a href="{% url 'create-project' %}" class="rounded-xl bg-[#eaf2ff] px-4 py-3 text-sm font-black text-[#0b55d9] no-underline">+ Projet</a>
+    <a href="{% url 'create-contribution' %}" class="rounded-xl bg-[#eaf2ff] px-4 py-3 text-sm font-black text-[#0b55d9] no-underline">+ Cotisation</a>
+    <a href="{% url 'mutuelle-report' mutuelle.id %}" class="rounded-xl bg-[#06194a] px-4 py-3 text-sm font-black text-white no-underline">📊 Rapport complet</a>
+  </div>
 </section>
 {% endblock %}

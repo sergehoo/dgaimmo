@@ -1,6 +1,6 @@
 from django.shortcuts import get_object_or_404, redirect, render
 from django.http import HttpResponse
-from django.db import transaction
+from django.db import models, transaction
 from django.db.models import Avg, Sum
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import login, update_session_auth_hash
@@ -67,7 +67,18 @@ from treasury.models import CashAccount
 
 
 class SecureLoginView(LoginView):
+    """Vue de connexion MutuelleX.
+
+    - Si l'utilisateur est déjà authentifié, redirige immédiatement vers
+      ``LOGIN_REDIRECT_URL`` (= ``dashboard-home``) au lieu d'afficher le
+      formulaire (``redirect_authenticated_user``).
+    - Enregistre un événement de connexion (succès / échec) dans LoginEvent
+      pour l'audit trail.
+    - Pose un cookie ``dga_device_id`` httpOnly pour le suivi d'appareil.
+    """
+
     template_name = "dashboard/login.html"
+    redirect_authenticated_user = True
 
     def form_valid(self, form):
         user = form.get_user()
@@ -84,9 +95,54 @@ class SecureLoginView(LoginView):
 
 
 def _active_mutuelle(request):
+    """Résolution robuste de la mutuelle active pour l'utilisateur courant.
+
+    Ordre de résolution :
+    1. ``request.mutuelle`` (posée par ``ActiveTenantMiddleware`` depuis le
+       header ``X-Mutuelle-ID`` ou ``request.user.default_mutuelle``).
+    2. ``request.user.default_mutuelle`` (re-check explicite).
+    3. Première ``MutuelleMembership`` active de l'utilisateur (admin prioritaire).
+    4. Pour les superusers : première mutuelle ACTIVE en base.
+    5. Sinon : ``None`` (l'appelant peut alors rediriger vers ``create-mutuelle``).
+
+    Lors du fallback via membership ou superuser, on met à jour
+    ``user.default_mutuelle`` pour que les requêtes suivantes soient cohérentes.
+    """
     mutuelle = getattr(request, "mutuelle", None)
-    if not mutuelle:
+    user = getattr(request, "user", None)
+
+    if not mutuelle and user is not None and user.is_authenticated:
+        mutuelle = user.default_mutuelle
+
+    if not mutuelle and user is not None and user.is_authenticated:
+        # Fallback : memberships actifs de l'utilisateur, admin prioritaire
+        membership = (
+            MutuelleMembership.objects.filter(user=user, active=True)
+            .select_related("mutuelle")
+            .order_by(
+                # priorité admin → autre rôle
+                models.Case(models.When(role="admin", then=0), default=1),
+                "created_at",
+            )
+            .first()
+        )
+        if membership:
+            mutuelle = membership.mutuelle
+
+    if not mutuelle and user is not None and user.is_authenticated and user.is_superuser:
+        # Superuser sans rattachement : on lui donne la première mutuelle active
         mutuelle = Mutuelle.objects.filter(status=Mutuelle.Status.ACTIVE).order_by("created_at").first()
+
+    # Persiste la mutuelle résolue comme default pour les prochaines requêtes
+    if (
+        mutuelle
+        and user is not None
+        and user.is_authenticated
+        and not user.default_mutuelle_id
+    ):
+        user.default_mutuelle = mutuelle
+        user.save(update_fields=["default_mutuelle"])
+
     return mutuelle
 
 
@@ -421,9 +477,25 @@ def mutuelles_list(request):
 
 @login_required
 def mutuelle_detail(request, mutuelle_id):
+    """Page de détail d'une mutuelle.
+
+    KPI affichés :
+    1. Nombre de membres
+    2. Capacité d'emprunt totale (somme des mensualités max autorisées des membres)
+    3. Score de solvabilité global (MutuelleGlobalScore)
+    4. Budget estimé du projet possible (financement collectif maximum)
+
+    Sections :
+    - Membres (avec banque et fonction)
+    - Analyse financière (quotité cessible + cotisations)
+    - Projets proposés (opportunités immobilières)
+    - Suivi des paiements (paiements & cotisations récentes)
+    - Documents
+    """
     mutuelle = get_object_or_404(Mutuelle, id=mutuelle_id)
     context = _mutuelle_context(mutuelle)
     context["active_tab"] = "mutuelles"
+
     members_qs = Member.all_objects.filter(mutuelle=mutuelle)
     contribution_qs = Contribution.all_objects.filter(mutuelle=mutuelle)
     payment_qs = Payment.all_objects.filter(mutuelle=mutuelle)
@@ -433,38 +505,71 @@ def mutuelle_detail(request, mutuelle_id):
     simulations_qs = QuotiteCessibleSimulation.all_objects.filter(mutuelle=mutuelle)
     documents_qs = PropertyDocument.all_objects.filter(mutuelle=mutuelle)
     applications_qs = MortgageApplication.all_objects.filter(mutuelle=mutuelle)
+
+    members_total = members_qs.count()
+    # KPI #2 : Capacité d'emprunt totale (mensualité cumulée déjà calculée dans _mutuelle_context)
+    total_borrowing_capacity = context.get("quotite_mutuelle_monthly_capacity") or 0
+    # KPI #4 : Budget estimé du projet possible = financement collectif max
+    estimated_project_budget = context.get("collective_capacity") or context.get("quotite_mutuelle_financeable_amount") or 0
+    # KPI #3 : Score de solvabilité global
+    mutuelle_score = context.get("score")
+    solvency_score = mutuelle_score.score if mutuelle_score else 0
+    solvency_level = mutuelle_score.health_level if mutuelle_score else "À évaluer"
+
     context.update(
         {
-            "members": members_qs.order_by("last_name", "first_name")[:8],
-            "members_total": members_qs.count(),
+            # ---- KPI principaux ----
+            "kpi_members_count": members_total,
+            "kpi_borrowing_capacity": total_borrowing_capacity,
+            "kpi_solvency_score": solvency_score,
+            "kpi_solvency_level": solvency_level,
+            "kpi_project_budget": estimated_project_budget,
+
+            # ---- Section Membres ----
+            "members": members_qs.select_related("bank").order_by("last_name", "first_name")[:12],
+            "members_total": members_total,
             "members_kyc_validated": members_qs.filter(kyc_validated=True).count(),
+            "members_active": members_qs.filter(status=Member.Status.ACTIVE).count(),
             "members_delinquent": members_qs.filter(status=Member.Status.DELINQUENT).count(),
+
+            # ---- Section Analyse financière ----
             "contributions_paid_total": contribution_qs.filter(status=Contribution.Status.PAID).aggregate(total=Sum("amount"))["total"] or 0,
             "contributions_due_count": contribution_qs.filter(status__in=[Contribution.Status.DUE, Contribution.Status.PARTIAL, Contribution.Status.OVERDUE]).count(),
             "contributions_overdue_count": contribution_qs.filter(status=Contribution.Status.OVERDUE).count(),
-            "payments_success_total": payment_qs.filter(status=Payment.Status.SUCCESS).aggregate(total=Sum("amount"))["total"] or 0,
-            "payments_pending_count": payment_qs.filter(status__in=[Payment.Status.INITIATED, Payment.Status.PENDING]).count(),
-            "claims_open_count": claims_qs.exclude(status__in=[AssistanceClaim.Status.CLOSED, AssistanceClaim.Status.REJECTED]).count(),
-            "claims_paid_total": claims_qs.filter(status__in=[AssistanceClaim.Status.PAID, AssistanceClaim.Status.CLOSED]).aggregate(total=Sum("approved_amount"))["total"] or 0,
-            "programs": programs_qs.order_by("-created_at")[:4],
-            "opportunities": opportunities_qs.select_related("program").order_by("-score", "-created_at")[:4],
-            "available_lots": PropertyLot.all_objects.filter(mutuelle=mutuelle, status=PropertyLot.Status.AVAILABLE).count(),
-            "approved_reservations": PropertyReservation.all_objects.filter(mutuelle=mutuelle, status__in=[PropertyReservation.Status.APPROVED, PropertyReservation.Status.CONVERTED]).count(),
-            "documents_total": documents_qs.count(),
-            "documents_verified": documents_qs.filter(verified=True).count(),
-            "documents_pending": documents_qs.filter(verified=False).count(),
-            "mortgage_applications": applications_qs.select_related("member", "scenario", "scenario__opportunity").order_by("-created_at")[:5],
-            "mortgage_applications_count": applications_qs.count(),
-            "mortgage_approved_count": applications_qs.filter(status__in=[MortgageApplication.Status.APPROVED, MortgageApplication.Status.DISBURSED, MortgageApplication.Status.CLOSED]).count(),
-            "mortgage_disbursed_total": applications_qs.aggregate(total=Sum("disbursed_amount"))["total"] or 0,
-            "recent_contributions": contribution_qs.select_related("member", "plan").order_by("-created_at")[:5],
-            "recent_payments": payment_qs.select_related("member").order_by("-created_at")[:5],
-            "recent_claims": claims_qs.select_related("member").order_by("-created_at")[:5],
-            "recent_simulations": simulations_qs.select_related("member").order_by("-created_at")[:5],
+            "treasury_balance": context.get("treasury_balance", 0),
             "simulations_total": simulations_qs.count(),
             "simulations_eligible": simulations_qs.filter(decision=QuotiteCessibleSimulation.Decision.ELIGIBLE).count(),
             "simulations_conditional": simulations_qs.filter(decision=QuotiteCessibleSimulation.Decision.CONDITIONAL).count(),
             "simulations_rejected": simulations_qs.filter(decision=QuotiteCessibleSimulation.Decision.REJECTED).count(),
+
+            # ---- Section Projets proposés ----
+            "programs": programs_qs.order_by("-created_at")[:6],
+            "programs_count": programs_qs.count(),
+            "opportunities": opportunities_qs.select_related("program").order_by("-score", "-created_at")[:6],
+            "available_lots": PropertyLot.all_objects.filter(mutuelle=mutuelle, status=PropertyLot.Status.AVAILABLE).count(),
+            "approved_reservations": PropertyReservation.all_objects.filter(mutuelle=mutuelle, status__in=[PropertyReservation.Status.APPROVED, PropertyReservation.Status.CONVERTED]).count(),
+
+            # ---- Section Suivi des paiements ----
+            "payments_success_total": payment_qs.filter(status=Payment.Status.SUCCESS).aggregate(total=Sum("amount"))["total"] or 0,
+            "payments_pending_count": payment_qs.filter(status__in=[Payment.Status.INITIATED, Payment.Status.PENDING]).count(),
+            "payments_failed_count": payment_qs.filter(status=Payment.Status.FAILED).count() if hasattr(Payment.Status, "FAILED") else 0,
+            "recent_contributions": contribution_qs.select_related("member", "plan").order_by("-created_at")[:8],
+            "recent_payments": payment_qs.select_related("member").order_by("-created_at")[:8],
+            "recent_claims": claims_qs.select_related("member").order_by("-created_at")[:5],
+            "claims_open_count": claims_qs.exclude(status__in=[AssistanceClaim.Status.CLOSED, AssistanceClaim.Status.REJECTED]).count(),
+            "claims_paid_total": claims_qs.filter(status__in=[AssistanceClaim.Status.PAID, AssistanceClaim.Status.CLOSED]).aggregate(total=Sum("approved_amount"))["total"] or 0,
+
+            # ---- Section Documents ----
+            "documents_total": documents_qs.count(),
+            "documents_verified": documents_qs.filter(verified=True).count(),
+            "documents_pending": documents_qs.filter(verified=False).count(),
+            "recent_documents": documents_qs.order_by("-created_at")[:8],
+
+            # ---- Bonus : dossiers financement ----
+            "mortgage_applications": applications_qs.select_related("member", "scenario", "scenario__opportunity").order_by("-created_at")[:5],
+            "mortgage_applications_count": applications_qs.count(),
+            "mortgage_approved_count": applications_qs.filter(status__in=[MortgageApplication.Status.APPROVED, MortgageApplication.Status.DISBURSED, MortgageApplication.Status.CLOSED]).count(),
+            "mortgage_disbursed_total": applications_qs.aggregate(total=Sum("disbursed_amount"))["total"] or 0,
         }
     )
     return render(request, "dashboard/mutuelle_detail.html", context)
@@ -675,13 +780,43 @@ def _render_form(request, form, title, subtitle, submit_label, back_url):
 
 
 @login_required
+@transaction.atomic
 def create_mutuelle(request):
+    """Workflow d'onboarding mutuelle (authentifié).
+
+    Étapes prises en charge :
+    1. Validation des champs métier (organisation, dimensionnement, objectif immobilier)
+    2. Création de la mutuelle (statut ACTIVE) avec slug unique
+    3. Provisioning du quota tenant
+    4. Rattachement automatique du créateur comme admin mutuelle
+    5. Définition de la mutuelle par défaut si l'utilisateur n'en a pas
+    """
     form = MutuelleCreateForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         mutuelle = form.save()
         TenantQuota.objects.get_or_create(mutuelle=mutuelle)
+        MutuelleMembership.objects.get_or_create(
+            mutuelle=mutuelle,
+            user=request.user,
+            defaults={"role": "admin", "permissions": ["*"], "active": True},
+        )
+        if not request.user.default_mutuelle_id:
+            request.user.default_mutuelle = mutuelle
+            request.user.save(update_fields=["default_mutuelle"])
         return redirect("mutuelle-detail", mutuelle_id=mutuelle.id)
-    return _render_form(request, form, "Créer une mutuelle", "Configurez l'identité, le pays, la devise et le branding.", "Créer la mutuelle", "mutuelles-list")
+
+    context = _global_context()
+    context.update(
+        {
+            "form": form,
+            "title": "Créer une mutuelle",
+            "subtitle": "Identifiez l'organisation porteuse, dimensionnez la mutuelle, déclarez l'objectif immobilier et le contact référent.",
+            "submit_label": "Créer la mutuelle",
+            "back_url": "mutuelles-list",
+            "active_tab": "dashboard",
+        }
+    )
+    return render(request, "dashboard/form_mutuelle.html", context)
 
 
 @login_required
@@ -695,12 +830,44 @@ def update_mutuelle_branding(request, mutuelle_id):
 
 
 @login_required
+@transaction.atomic
 def create_member(request):
-    form = MemberCreateForm(request.POST or None)
+    """Workflow d'enrôlement membre complet.
+
+    La mutuelle d'affectation est résolue automatiquement via ``_active_mutuelle``
+    (header X-Mutuelle-ID → user.default_mutuelle → MutuelleMembership →
+    fallback superuser → premier ACTIVE). L'utilisateur ne la sélectionne
+    jamais : on garantit ainsi l'isolation tenant.
+
+    Si vraiment aucune mutuelle n'existe et que l'utilisateur n'est rattaché
+    à aucune, on redirige vers la création de mutuelle.
+    """
+    active_mutuelle = _active_mutuelle(request)
+    if not active_mutuelle:
+        return redirect("create-mutuelle")
+
+    form = MemberCreateForm(
+        request.POST or None,
+        request.FILES or None,
+        mutuelle=active_mutuelle,
+    )
     if request.method == "POST" and form.is_valid():
-        member = form.save()
+        form.save()
         return redirect("create-financial-profile")
-    return _render_form(request, form, "Ajouter un membre", "Enrôlez un mutualiste et préparez son dossier de capacité.", "Ajouter le membre", "members-center")
+
+    context = _global_context()
+    context.update(
+        {
+            "form": form,
+            "active_mutuelle": active_mutuelle,
+            "title": "Ajouter un membre",
+            "subtitle": "Enrôlez un mutualiste : identité, famille, profession, banque affiliée. Le profil financier (revenus, charges, dettes) sera saisi à l'étape suivante.",
+            "submit_label": "Enregistrer le membre",
+            "back_url": "members-center",
+            "active_tab": "members",
+        }
+    )
+    return render(request, "dashboard/form_member.html", context)
 
 
 @login_required

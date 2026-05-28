@@ -1,0 +1,165 @@
+{% extends "dashboard/console_base.html" %}
+{% block console_content %}
+<div class="mb-7 flex flex-wrap items-center justify-between gap-4">
+  <div>
+    <p class="text-sm font-bold text-[#536484]">MutuelleX · Workflow d'onboarding</p>
+    <h1 class="text-3xl font-black">{{ title }}</h1>
+    <p class="mt-2 max-w-2xl text-sm font-semibold text-[#536484]">{{ subtitle }}</p>
+  </div>
+  <a href="{% url back_url %}" class="rounded-xl border border-[#dce7f6] bg-white px-5 py-3 text-sm font-black text-[#06337d] no-underline">Retour</a>
+</div>
+
+<section class="grid gap-6 xl:grid-cols-[1fr_.45fr]">
+  <form method="post" enctype="multipart/form-data" class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm"
+        x-data="{ selected: '{{ form.primary_color.value|default:'#0b55d9' }}', selectedAccent: '{{ form.accent_color.value|default:'#0bbf63' }}' }">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+      <div class="mb-5 rounded-xl bg-red-50 p-4 text-sm font-bold text-red-700">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    {# ---------- Bloc 1 : Identité mutuelle ---------- #}
+    <h2 class="mb-3 text-lg font-black text-[#06194a]">Identité de la mutuelle</h2>
+    <div class="grid gap-5 md:grid-cols-2">
+      <div class="md:col-span-2">
+        <label class="mb-2 block text-sm font-black text-[#06194a]" for="{{ form.name.id_for_label }}">{{ form.name.label }} <span class="text-red-500">*</span></label>
+        {{ form.name }}
+        {% for error in form.name.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+      <div>
+        <label class="mb-2 block text-sm font-black text-[#06194a]" for="{{ form.organization_name.id_for_label }}">{{ form.organization_name.label }} <span class="text-red-500">*</span></label>
+        {{ form.organization_name }}
+        {% if form.organization_name.help_text %}<p class="mt-1 text-xs font-semibold text-[#536484]">{{ form.organization_name.help_text }}</p>{% endif %}
+        {% for error in form.organization_name.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+      <div>
+        <label class="mb-2 block text-sm font-black text-[#06194a]" for="{{ form.organization_type.id_for_label }}">{{ form.organization_type.label }}</label>
+        {{ form.organization_type }}
+        {% for error in form.organization_type.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+      <div class="md:col-span-2">
+        <label class="mb-2 block text-sm font-black text-[#06194a]" for="{{ form.legal_name.id_for_label }}">{{ form.legal_name.label }}</label>
+        {{ form.legal_name }}
+        {% for error in form.legal_name.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+    </div>
+
+    {# ---------- Bloc 2 : Dimensionnement & objectif ---------- #}
+    <h2 class="mb-3 mt-8 text-lg font-black text-[#06194a]">Dimensionnement &amp; objectif immobilier</h2>
+    <div class="grid gap-5 md:grid-cols-2">
+      <div class="md:col-span-2">
+        <label class="mb-2 block text-sm font-black text-[#06194a]" for="{{ form.estimated_members_count.id_for_label }}">{{ form.estimated_members_count.label }} <span class="text-red-500">*</span></label>
+        {{ form.estimated_members_count }}
+        {% if form.estimated_members_count.help_text %}<p class="mt-1 text-xs font-semibold text-[#536484]">{{ form.estimated_members_count.help_text }}</p>{% endif %}
+        {% for error in form.estimated_members_count.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+      <div class="md:col-span-2">
+        <label class="mb-2 block text-sm font-black text-[#06194a]">{{ form.real_estate_objective.label }} <span class="text-red-500">*</span></label>
+        <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 rounded-2xl border border-[#e5edf8] bg-[#f7faff] p-4">
+          {% for choice in form.real_estate_objective %}
+            <label class="flex cursor-pointer items-center gap-3 rounded-xl border border-transparent bg-white px-3 py-3 text-sm font-bold text-[#06194a] transition hover:border-[#0b55d9]">
+              {{ choice.tag }}
+              <span>{{ choice.choice_label }}</span>
+            </label>
+          {% endfor %}
+        </div>
+        {% if form.real_estate_objective.help_text %}<p class="mt-1 text-xs font-semibold text-[#536484]">{{ form.real_estate_objective.help_text }}</p>{% endif %}
+        {% for error in form.real_estate_objective.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+      <div class="md:col-span-2">
+        <label class="mb-2 block text-sm font-black text-[#06194a]" for="{{ form.real_estate_objective_details.id_for_label }}">{{ form.real_estate_objective_details.label }}</label>
+        {{ form.real_estate_objective_details }}
+        {% if form.real_estate_objective_details.help_text %}<p class="mt-1 text-xs font-semibold text-[#536484]">{{ form.real_estate_objective_details.help_text }}</p>{% endif %}
+        {% for error in form.real_estate_objective_details.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+    </div>
+
+    {# ---------- Bloc 3 : Contact référent ---------- #}
+    <h2 class="mb-3 mt-8 text-lg font-black text-[#06194a]">Contact référent</h2>
+    <div class="grid gap-5 md:grid-cols-2">
+      <div>
+        <label class="mb-2 block text-sm font-black text-[#06194a]" for="{{ form.contact_last_name.id_for_label }}">{{ form.contact_last_name.label }} <span class="text-red-500">*</span></label>
+        {{ form.contact_last_name }}
+        {% for error in form.contact_last_name.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+      <div>
+        <label class="mb-2 block text-sm font-black text-[#06194a]" for="{{ form.contact_first_name.id_for_label }}">{{ form.contact_first_name.label }} <span class="text-red-500">*</span></label>
+        {{ form.contact_first_name }}
+        {% for error in form.contact_first_name.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+      <div>
+        <label class="mb-2 block text-sm font-black text-[#06194a]" for="{{ form.contact_function.id_for_label }}">{{ form.contact_function.label }} <span class="text-red-500">*</span></label>
+        {{ form.contact_function }}
+        {% if form.contact_function.help_text %}<p class="mt-1 text-xs font-semibold text-[#536484]">{{ form.contact_function.help_text }}</p>{% endif %}
+        {% for error in form.contact_function.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+      <div>
+        <label class="mb-2 block text-sm font-black text-[#06194a]" for="{{ form.contact_email.id_for_label }}">{{ form.contact_email.label }} <span class="text-red-500">*</span></label>
+        {{ form.contact_email }}
+        {% for error in form.contact_email.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+      <div class="md:col-span-2">
+        <label class="mb-2 block text-sm font-black text-[#06194a]" for="{{ form.contact_phone.id_for_label }}">{{ form.contact_phone.label }}</label>
+        {{ form.contact_phone }}
+        {% for error in form.contact_phone.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+    </div>
+
+    {# ---------- Bloc 4 : Localisation & branding ---------- #}
+    <h2 class="mb-3 mt-8 text-lg font-black text-[#06194a]">Localisation &amp; branding</h2>
+    <div class="grid gap-5 md:grid-cols-2">
+      <div>
+        <label class="mb-2 block text-sm font-black text-[#06194a]" for="{{ form.country.id_for_label }}">{{ form.country.label }}</label>
+        {{ form.country }}
+        {% for error in form.country.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+      <div>
+        <label class="mb-2 block text-sm font-black text-[#06194a]" for="{{ form.currency.id_for_label }}">{{ form.currency.label }}</label>
+        {{ form.currency }}
+        {% for error in form.currency.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+      <div class="md:col-span-2">
+        <label class="mb-2 block text-sm font-black text-[#06194a]" for="{{ form.primary_color.id_for_label }}">{{ form.primary_color.label }}</label>
+        <div class="rounded-2xl border border-[#e5edf8] bg-[#f7faff] p-4">
+          <div class="flex flex-wrap items-center gap-4">
+            <div class="flex items-center gap-3">
+              {{ form.primary_color }}
+              <span class="rounded-xl bg-white px-4 py-3 text-sm font-black text-[#06194a]" x-text="selected"></span>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <template x-for="color in ['#003b98','#0b55d9','#06194a','#0aa25f','#12b76a','#7c3aed','#b7791f','#be123c']" :key="color">
+                <button type="button"
+                  @click="selected = color; document.getElementById('{{ form.primary_color.id_for_label }}').value = color"
+                  :style="`background:${color}`"
+                  class="h-10 w-10 rounded-xl border-2 border-white shadow-sm"></button>
+              </template>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <label class="mb-2 block text-sm font-black text-[#06194a]" for="{{ form.accent_color.id_for_label }}">{{ form.accent_color.label }}</label>
+        <div class="flex items-center gap-3 rounded-2xl border border-[#e5edf8] bg-[#f7faff] p-3">
+          {{ form.accent_color }}
+          <span class="rounded-xl bg-white px-4 py-3 text-sm font-black text-[#06194a]" x-text="selectedAccent"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-8 flex flex-wrap gap-3">
+      <button type="submit" class="rounded-xl bg-[#0b55d9] px-6 py-4 text-sm font-black text-white shadow-lg shadow-blue-900/20">{{ submit_label }}</button>
+      <a href="{% url back_url %}" class="rounded-xl border border-[#dce7f6] bg-white px-6 py-4 text-sm font-black text-[#06194a] no-underline">Annuler</a>
+    </div>
+  </form>
+
+  <aside class="rounded-2xl bg-[#06194a] p-7 text-white shadow-2xl shadow-blue-950/15">
+    <span class="text-xs font-black uppercase text-[#72e7a6]">Assistance intelligente</span>
+    <h2 class="mt-4 text-2xl font-black">Onboarding mutuelle</h2>
+    <div class="mt-6 grid gap-4 text-sm text-white/80">
+      <p class="rounded-2xl bg-white/10 p-4"><b class="block text-white">🏗️ Objectif immobilier</b><span class="mt-1 block">Catégorise la mutuelle (terrain, maison, immeuble) et alimente le scoring programme.</span></p>
+      <p class="rounded-2xl bg-white/10 p-4"><b class="block text-white">👥 Dimensionnement</b><span class="mt-1 block">Le nombre estimé de membres pondère la capacité collective et la projection trésorerie.</span></p>
+      <p class="rounded-2xl bg-white/10 p-4"><b class="block text-white">📇 Contact référent</b><span class="mt-1 block">NOM, prénoms, fonction et email obligatoires pour les notifications et la gouvernance.</span></p>
+      <p class="rounded-2xl bg-white/10 p-4"><b class="block text-white">🛡️ Isolation tenant</b><span class="mt-1 block">Toute la donnée est rattachée à votre mutuelle dès la création (membres, finances, IA, audit).</span></p>
+    </div>
+  </aside>
+</section>
+{% endblock %}

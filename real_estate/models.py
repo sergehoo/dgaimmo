@@ -101,28 +101,86 @@ class PropertyReservation(TenantModel):
 
 
 class MemberFinancialProfile(TenantModel):
+    """Profil financier du membre : revenus déclarés, charges, engagements
+    et statut professionnel utilisés pour la quotité cessible et le scoring."""
+
     class EmploymentType(models.TextChoices):
         PUBLIC = "public", "Fonctionnaire"
         PRIVATE = "private", "Salarié privé"
         INDEPENDENT = "independent", "Indépendant"
         INFORMAL = "informal", "Revenus informels"
+        RETIRED = "retired", "Retraité"
+        STUDENT = "student", "Étudiant"
 
-    member = models.OneToOneField("memberships.Member", on_delete=models.CASCADE, related_name="financial_profile")
-    net_monthly_salary = models.DecimalField(max_digits=14, decimal_places=2, default=0)
-    complementary_income = models.DecimalField(max_digits=14, decimal_places=2, default=0)
-    fixed_charges = models.DecimalField(max_digits=14, decimal_places=2, default=0)
-    pensions = models.DecimalField(max_digits=14, decimal_places=2, default=0)
-    mutual_contributions = models.DecimalField(max_digits=14, decimal_places=2, default=0)
-    dependents_count = models.PositiveSmallIntegerField(default=0)
-    professional_seniority_months = models.PositiveIntegerField(default=0)
-    contract_type = models.CharField(max_length=80, blank=True)
-    employment_type = models.CharField(max_length=24, choices=EmploymentType.choices, default=EmploymentType.PRIVATE)
+    member = models.OneToOneField(
+        "memberships.Member", on_delete=models.CASCADE, related_name="financial_profile"
+    )
+    # Revenus
+    net_monthly_salary = models.DecimalField(
+        "Revenu mensuel net", max_digits=14, decimal_places=2, default=0
+    )
+    complementary_income = models.DecimalField(
+        "Revenus complémentaires", max_digits=14, decimal_places=2, default=0
+    )
+    pensions = models.DecimalField("Pensions reçues", max_digits=14, decimal_places=2, default=0)
+
+    # Charges & engagements
+    fixed_charges = models.DecimalField(
+        "Charges mensuelles fixes", max_digits=14, decimal_places=2, default=0
+    )
+    existing_loan_payments = models.DecimalField(
+        "Prêts en cours (mensualité totale)",
+        max_digits=14,
+        decimal_places=2,
+        default=0,
+        help_text="Somme des mensualités de tous les prêts bancaires/microcrédits en cours.",
+    )
+    other_debts = models.DecimalField(
+        "Autres dettes mensualisées",
+        max_digits=14,
+        decimal_places=2,
+        default=0,
+        help_text="Dettes hors prêts (loyer impayé, dettes familiales, etc.).",
+    )
+    pensions_paid = models.DecimalField(
+        "Pensions versées (alimentaire...)", max_digits=14, decimal_places=2, default=0
+    )
+    mutual_contributions = models.DecimalField(
+        "Cotisations mutuelle", max_digits=14, decimal_places=2, default=0
+    )
+
+    # Situation pro & familiale (dénormalisée pour faciliter le scoring rapide)
+    dependents_count = models.PositiveSmallIntegerField("Personnes à charge", default=0)
+    professional_seniority_months = models.PositiveIntegerField(
+        "Ancienneté professionnelle (mois)", default=0
+    )
+    contract_type = models.CharField("Type de contrat (CDI, CDD...)", max_length=80, blank=True)
+    employment_type = models.CharField(
+        "Statut professionnel",
+        max_length=24,
+        choices=EmploymentType.choices,
+        default=EmploymentType.PRIVATE,
+    )
     risk_level = models.CharField(max_length=24, default="medium", db_index=True)
     metadata = models.JSONField(default=dict, blank=True)
 
     @property
     def total_income(self):
         return self.net_monthly_salary + self.complementary_income + self.pensions
+
+    @property
+    def total_monthly_charges(self):
+        return (
+            self.fixed_charges
+            + self.existing_loan_payments
+            + self.other_debts
+            + self.pensions_paid
+            + self.mutual_contributions
+        )
+
+    @property
+    def disposable_income(self):
+        return self.total_income - self.total_monthly_charges
 
 
 class DebtCommitment(TenantModel):

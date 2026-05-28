@@ -12,7 +12,7 @@ from accounts.models import OTPChallenge
 from claims.models import AssistanceClaim
 from contributions.models import Contribution, ContributionPlan
 from governance.models import GeneralAssembly, Resolution
-from memberships.models import Member
+from memberships.models import Bank, Member
 from mutuelles.models import Mutuelle
 from payments.models import Payment
 from notifications.models import Notification
@@ -34,17 +34,35 @@ BASE_TEXTAREA = "min-h-28 w-full rounded-xl border border-[#dbe6f5] bg-white px-
 COLOR_INPUT = "h-12 w-16 cursor-pointer rounded-xl border border-[#dbe6f5] bg-white p-1 outline-none focus:border-[#0b55d9]"
 
 
+class ColorInput(forms.TextInput):
+    """Widget HTML5 <input type=color> (absent en standard Django jusqu'à 5.x)."""
+
+    input_type = "color"
+
+
+# Compat ascendante : certains modules référencent forms.ColorInput
+if not hasattr(forms, "ColorInput"):
+    forms.ColorInput = ColorInput
+
+
 class StyledModelForm(forms.ModelForm):
     def _style_fields(self):
         for name, field in self.fields.items():
-            if isinstance(field.widget, forms.Textarea):
-                field.widget.attrs.setdefault("class", BASE_TEXTAREA)
-            elif isinstance(field.widget, forms.Select):
-                field.widget.attrs.setdefault("class", BASE_SELECT)
-            elif isinstance(field.widget, forms.ColorInput) or name in {"primary_color", "accent_color"}:
-                field.widget = forms.ColorInput(attrs={**field.widget.attrs, "class": COLOR_INPUT})
+            widget = field.widget
+            # Multi-checkboxes & radio : on laisse le rendu natif (le template gère)
+            if isinstance(widget, (forms.CheckboxSelectMultiple, forms.RadioSelect)):
+                continue
+            # Case à cocher unique : pas de class plein-input
+            if isinstance(widget, forms.CheckboxInput):
+                continue
+            if isinstance(widget, forms.Textarea):
+                widget.attrs.setdefault("class", BASE_TEXTAREA)
+            elif isinstance(widget, forms.Select):
+                widget.attrs.setdefault("class", BASE_SELECT)
+            elif isinstance(widget, ColorInput) or name in {"primary_color", "accent_color"}:
+                field.widget = ColorInput(attrs={**widget.attrs, "class": COLOR_INPUT})
             else:
-                field.widget.attrs.setdefault("class", BASE_INPUT)
+                widget.attrs.setdefault("class", BASE_INPUT)
 
 
 class UserProfileForm(StyledModelForm):
@@ -101,67 +119,227 @@ class UserPasswordChangeForm(PasswordChangeForm):
 
 
 class MutuelleCreateForm(StyledModelForm):
+    """Formulaire admin pour créer une mutuelle depuis la console.
+
+    Implémente le workflow d'onboarding avec :
+    - identité (nom, organisation porteuse)
+    - dimensionnement (membres estimés, objectif immobilier)
+    - contact référent (NOM, prénoms, fonction, email)
+    - branding et localisation
+    """
+
     class Meta:
         model = Mutuelle
-        fields = ["name", "legal_name", "country", "currency", "primary_color", "accent_color"]
+        fields = [
+            "name",
+            "organization_name",
+            "organization_type",
+            "legal_name",
+            "estimated_members_count",
+            "real_estate_objective",
+            "real_estate_objective_details",
+            "contact_last_name",
+            "contact_first_name",
+            "contact_function",
+            "contact_email",
+            "contact_phone",
+            "country",
+            "currency",
+            "primary_color",
+            "accent_color",
+        ]
         labels = {
             "name": "Nom de la mutuelle",
+            "organization_name": "Entreprise / organisation",
+            "organization_type": "Type d'organisation",
             "legal_name": "Raison sociale",
+            "estimated_members_count": "Nombre estimé de membres",
+            "real_estate_objective": "Objectif immobilier",
+            "real_estate_objective_details": "Précisions sur l'objectif",
+            "contact_last_name": "NOM du contact",
+            "contact_first_name": "Prénom(s) du contact",
+            "contact_function": "Fonction",
+            "contact_email": "Email du contact",
+            "contact_phone": "Téléphone du contact",
             "country": "Pays",
             "currency": "Devise",
             "primary_color": "Couleur principale",
             "accent_color": "Couleur secondaire",
         }
         widgets = {
-            "primary_color": forms.ColorInput,
-            "accent_color": forms.ColorInput,
+            "primary_color": ColorInput,
+            "accent_color": ColorInput,
+            "real_estate_objective_details": forms.Textarea(attrs={"rows": 3}),
+            "estimated_members_count": forms.NumberInput(attrs={"min": 0, "step": 1}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+        # Le JSONField est rendu par défaut comme un textarea JSON brut.
+        # On le remplace par un MultipleChoiceField avec cases à cocher.
+        self.fields["real_estate_objective"] = forms.MultipleChoiceField(
+            label="Objectifs immobiliers",
+            choices=Mutuelle.RealEstateObjective.choices,
+            widget=forms.CheckboxSelectMultiple(attrs={"class": "mx-objective-checkboxes"}),
+            required=True,
+            help_text="Sélectionnez un ou plusieurs objectifs poursuivis collectivement par la mutuelle.",
+        )
+        # Pré-remplissage : si on édite une instance existante, restaurer la liste
+        instance = kwargs.get("instance") or getattr(self, "instance", None)
+        if instance and isinstance(getattr(instance, "real_estate_objective", None), list):
+            self.initial["real_estate_objective"] = instance.real_estate_objective
+
+        # Champs marqués requis pour ce workflow d'onboarding
+        for required_name in (
+            "organization_name",
+            "estimated_members_count",
+            "real_estate_objective",
+            "contact_last_name",
+            "contact_first_name",
+            "contact_function",
+            "contact_email",
+        ):
+            if required_name in self.fields:
+                self.fields[required_name].required = True
         self._style_fields()
+        # Placeholder UX premium
+        placeholders = {
+            "name": "Ex. Mutuelle Habitat Cocody",
+            "organization_name": "Ex. Kaydan Groupe SARL",
+            "legal_name": "Dénomination officielle (facultatif)",
+            "estimated_members_count": "Ex. 250",
+            "contact_last_name": "OGAH",
+            "contact_first_name": "Serge",
+            "contact_function": "Président, DG, Trésorier...",
+            "contact_email": "contact@organisation.ci",
+            "contact_phone": "+225 07 00 00 00 00",
+            "real_estate_objective_details": "Zone visée, type de bien, budget, calendrier...",
+        }
+        for name, placeholder in placeholders.items():
+            if name in self.fields:
+                self.fields[name].widget.attrs.setdefault("placeholder", placeholder)
+
+    def clean_real_estate_objective(self):
+        # MultipleChoiceField renvoie une list[str] — assure une liste propre
+        values = self.cleaned_data.get("real_estate_objective") or []
+        return list(values)
+
+    def clean_contact_email(self):
+        return self.cleaned_data["contact_email"].strip().lower()
+
+    def clean_contact_last_name(self):
+        return self.cleaned_data["contact_last_name"].strip().upper()
+
+    def clean_contact_first_name(self):
+        value = self.cleaned_data["contact_first_name"].strip()
+        return " ".join(part.capitalize() for part in value.split())
+
+    def clean_name(self):
+        name = self.cleaned_data["name"].strip()
+        if not slugify(name):
+            raise forms.ValidationError("Le nom doit contenir au moins une lettre ou un chiffre.")
+        return name
 
     def save(self, commit=True):
         instance = super().save(commit=False)
         base_slug = slugify(instance.name)
         slug = base_slug
         index = 2
-        while Mutuelle.objects.filter(slug=slug).exists():
+        while Mutuelle.objects.filter(slug=slug).exclude(pk=instance.pk).exists():
             slug = f"{base_slug}-{index}"
             index += 1
         instance.slug = slug
-        instance.status = Mutuelle.Status.ACTIVE
+        if not instance.status:
+            instance.status = Mutuelle.Status.ACTIVE
         if commit:
             instance.save()
         return instance
 
 
 class PublicMutuelleSignupForm(forms.Form):
+    """Workflow public en une étape : crée la mutuelle, le compte admin
+    et capture les informations métier (organisation, dimensionnement,
+    objectif immobilier, contact référent)."""
+
+    # ---- Bloc Mutuelle ----
     mutuelle_name = forms.CharField(label="Nom de la mutuelle", max_length=180)
+    organization_name = forms.CharField(
+        label="Entreprise / organisation",
+        max_length=180,
+        help_text="Société, association, communauté ou groupe porteur de la mutuelle.",
+    )
+    organization_type = forms.ChoiceField(
+        label="Type d'organisation",
+        choices=Mutuelle.OrganizationType.choices,
+        initial=Mutuelle.OrganizationType.ENTREPRISE,
+    )
     legal_name = forms.CharField(label="Raison sociale", max_length=180, required=False)
+    estimated_members_count = forms.IntegerField(
+        label="Nombre estimé de membres",
+        min_value=1,
+        help_text="Estimation initiale pour dimensionner la mutuelle.",
+        widget=forms.NumberInput(attrs={"min": "1", "step": "1"}),
+    )
+    real_estate_objective = forms.MultipleChoiceField(
+        label="Objectifs immobiliers",
+        choices=Mutuelle.RealEstateObjective.choices,
+        initial=[Mutuelle.RealEstateObjective.TERRAIN],
+        widget=forms.CheckboxSelectMultiple(attrs={"class": "mx-objective-checkboxes"}),
+        help_text="Sélectionnez un ou plusieurs objectifs poursuivis collectivement par la mutuelle.",
+    )
+    real_estate_objective_details = forms.CharField(
+        label="Précisions sur l'objectif",
+        required=False,
+        widget=forms.Textarea(attrs={"rows": 3, "placeholder": "Zone visée, type de bien, budget, calendrier..."}),
+    )
     country = forms.CharField(label="Pays", max_length=2, initial="CI")
     currency = forms.CharField(label="Devise", max_length=3, initial="XOF")
     primary_color = forms.CharField(
         label="Couleur principale",
         max_length=16,
         initial="#003b98",
-        widget=forms.ColorInput(attrs={"class": COLOR_INPUT}),
+        widget=ColorInput(attrs={"class": COLOR_INPUT}),
     )
-    first_name = forms.CharField(label="Prénom", max_length=150)
-    last_name = forms.CharField(label="Nom", max_length=150)
-    email = forms.EmailField(label="Email professionnel")
-    phone = forms.CharField(label="Téléphone", max_length=32, required=False)
+
+    # ---- Bloc Contact référent ----
+    last_name = forms.CharField(label="NOM", max_length=150, help_text="Nom de famille du contact (sera mis en majuscules).")
+    first_name = forms.CharField(label="Prénom(s)", max_length=150)
+    contact_function = forms.CharField(
+        label="Fonction",
+        max_length=120,
+        help_text="Fonction au sein de l'organisation (Président, DG, Trésorier...).",
+    )
+    email = forms.EmailField(label="Email du contact")
+    phone = forms.CharField(label="Téléphone (Mobile Money)", max_length=32, required=False)
+
+    # ---- Bloc Sécurité ----
     password1 = forms.CharField(label="Mot de passe", widget=forms.PasswordInput)
     password2 = forms.CharField(label="Confirmer le mot de passe", widget=forms.PasswordInput)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for name, field in self.fields.items():
+            widget = field.widget
             if name == "primary_color":
                 continue
-            field.widget.attrs.setdefault("class", BASE_INPUT)
+            if isinstance(widget, forms.Textarea):
+                widget.attrs.setdefault("class", BASE_TEXTAREA)
+            elif isinstance(widget, forms.Select):
+                widget.attrs.setdefault("class", BASE_SELECT)
+            else:
+                widget.attrs.setdefault("class", BASE_INPUT)
         self.fields["country"].widget.attrs.setdefault("maxlength", "2")
         self.fields["currency"].widget.attrs.setdefault("maxlength", "3")
+        # Placeholders UX
+        self.fields["mutuelle_name"].widget.attrs.setdefault("placeholder", "Ex. Mutuelle Habitat Cocody")
+        self.fields["organization_name"].widget.attrs.setdefault("placeholder", "Ex. Kaydan Groupe SARL")
+        self.fields["estimated_members_count"].widget.attrs.setdefault("placeholder", "Ex. 250")
+        self.fields["last_name"].widget.attrs.setdefault("placeholder", "OGAH")
+        self.fields["first_name"].widget.attrs.setdefault("placeholder", "Serge")
+        self.fields["contact_function"].widget.attrs.setdefault("placeholder", "Président, DG, Trésorier...")
+        self.fields["email"].widget.attrs.setdefault("placeholder", "contact@organisation.ci")
+        self.fields["phone"].widget.attrs.setdefault("placeholder", "+225 07 00 00 00 00")
 
     def clean_email(self):
         email = self.cleaned_data["email"].strip().lower()
@@ -178,6 +356,19 @@ class PublicMutuelleSignupForm(forms.Form):
         if User.objects.filter(phone=phone).exists():
             raise forms.ValidationError("Un compte existe déjà avec ce téléphone.")
         return phone
+
+    def clean_last_name(self):
+        return self.cleaned_data["last_name"].strip().upper()
+
+    def clean_first_name(self):
+        value = self.cleaned_data["first_name"].strip()
+        return " ".join(part.capitalize() for part in value.split())
+
+    def clean_contact_function(self):
+        return self.cleaned_data["contact_function"].strip()
+
+    def clean_organization_name(self):
+        return self.cleaned_data["organization_name"].strip()
 
     def clean_mutuelle_name(self):
         name = self.cleaned_data["mutuelle_name"].strip()
@@ -210,6 +401,17 @@ class PublicMutuelleSignupForm(forms.Form):
         mutuelle = Mutuelle.objects.create(
             name=data["mutuelle_name"],
             legal_name=data.get("legal_name", ""),
+            organization_name=data["organization_name"],
+            organization_type=data["organization_type"],
+            estimated_members_count=data["estimated_members_count"],
+            # MultipleChoiceField → list[str]
+            real_estate_objective=list(data["real_estate_objective"] or []),
+            real_estate_objective_details=data.get("real_estate_objective_details", ""),
+            contact_last_name=data["last_name"],
+            contact_first_name=data["first_name"],
+            contact_function=data["contact_function"],
+            contact_email=data["email"],
+            contact_phone=data.get("phone") or "",
             slug=slugify(data["mutuelle_name"]),
             country=data["country"],
             currency=data["currency"],
@@ -242,8 +444,8 @@ class MutuelleBrandingForm(StyledModelForm):
             "logo": "Logo",
         }
         widgets = {
-            "primary_color": forms.ColorInput,
-            "accent_color": forms.ColorInput,
+            "primary_color": ColorInput,
+            "accent_color": ColorInput,
         }
 
     def __init__(self, *args, **kwargs):
@@ -252,26 +454,127 @@ class MutuelleBrandingForm(StyledModelForm):
 
 
 class MemberCreateForm(StyledModelForm):
-    mutuelle = forms.ModelChoiceField(queryset=Mutuelle.objects.all(), label="Mutuelle")
+    """Workflow complet de création membre.
+
+    Bloc 1 — Identité : nom, prénoms, email, téléphone, date de naissance, genre
+    Bloc 2 — Vie pro : entreprise, fonction, date d'embauche, ancienneté
+    Bloc 3 — Famille : situation matrimoniale, conjoint, personnes à charge
+    Bloc 4 — Bancaire : banque affiliée, numéro de compte
+    Bloc 5 — Adhésion : statut, KYC
+    """
 
     class Meta:
         model = Member
-        fields = ["mutuelle", "member_code", "first_name", "last_name", "phone", "email", "status", "kyc_validated"]
+        # Note : `status` et `kyc_validated` sont volontairement EXCLUS du
+        # formulaire d'enrôlement. Ils prennent leurs valeurs par défaut au
+        # niveau modèle (status=PROSPECT, kyc_validated=False) et sont
+        # modifiés ensuite via les écrans dédiés (workflow KYC, gestion
+        # statut adhésion).
+        fields = [
+            "member_code",
+            # Identité
+            "first_name",
+            "last_name",
+            "phone",
+            "email",
+            "birth_date",
+            "birth_place",
+            "gender",
+            "national_id",
+            # Vie pro
+            "employer",
+            "job_function",
+            "hire_date",
+            "professional_seniority_months",
+            # Famille
+            "marital_status",
+            "spouse_name",
+            "dependents_count",
+            # Banque
+            "bank",
+            "bank_account_number",
+        ]
+        widgets = {
+            "birth_date": forms.DateInput(attrs={"type": "date"}),
+            "hire_date": forms.DateInput(attrs={"type": "date"}),
+            "professional_seniority_months": forms.NumberInput(attrs={"min": 0, "step": 1}),
+            "dependents_count": forms.NumberInput(attrs={"min": 0, "step": 1}),
+        }
         labels = {
             "member_code": "Code membre",
-            "first_name": "Prénom",
-            "last_name": "Nom",
+            "first_name": "Prénom(s)",
+            "last_name": "NOM",
             "phone": "Téléphone",
-            "email": "Email",
-            "status": "Statut",
-            "kyc_validated": "KYC validé",
+            "email": "Email contact",
+            "birth_date": "Date de naissance",
+            "birth_place": "Lieu de naissance",
+            "gender": "Genre",
+            "national_id": "CNI / Passeport",
+            "employer": "Entreprise / employeur",
+            "job_function": "Fonction dans l'entreprise",
+            "hire_date": "Date d'embauche",
+            "professional_seniority_months": "Ancienneté (mois)",
+            "marital_status": "Situation matrimoniale",
+            "spouse_name": "Nom du conjoint",
+            "dependents_count": "Personnes à charge",
+            "bank": "Banque affiliée",
+            "bank_account_number": "Numéro de compte / IBAN",
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, mutuelle=None, **kwargs):
+        """
+        Args:
+            mutuelle: Mutuelle d'affectation (auto-injectée par la vue depuis
+                request.mutuelle ou request.user.default_mutuelle).
+        """
         super().__init__(*args, **kwargs)
+        self._mutuelle = mutuelle
         self.fields["member_code"].required = False
         self.fields["member_code"].help_text = "Laissez vide pour générer un code automatiquement."
+        # Banques actives uniquement
+        self.fields["bank"].queryset = Bank.objects.filter(active=True).order_by("name")
+        self.fields["bank"].required = False
+        self.fields["bank"].empty_label = "— Aucune / non renseignée —"
+        # Champs requis pour le workflow
+        for required in ("first_name", "last_name", "phone"):
+            self.fields[required].required = True
+        # Placeholders premium
+        placeholders = {
+            "first_name": "Serge",
+            "last_name": "OGAH",
+            "phone": "+225 07 00 00 00 00",
+            "email": "membre@email.ci",
+            "birth_place": "Abidjan, CI",
+            "national_id": "CI001234567",
+            "employer": "Kaydan Groupe SARL",
+            "job_function": "Responsable RH, Comptable, Ingénieur...",
+            "spouse_name": "Nom et prénoms du conjoint",
+            "bank_account_number": "CI93 CI16 0103 0000 0000 0000 0000",
+        }
+        for name, ph in placeholders.items():
+            if name in self.fields:
+                self.fields[name].widget.attrs.setdefault("placeholder", ph)
         self._style_fields()
+
+    def clean(self):
+        cleaned = super().clean()
+        if not self._mutuelle:
+            raise forms.ValidationError(
+                "Aucune mutuelle active n'est rattachée à votre compte. "
+                "Sélectionnez ou créez une mutuelle avant d'enrôler un membre."
+            )
+        return cleaned
+
+    def clean_last_name(self):
+        return self.cleaned_data["last_name"].strip().upper()
+
+    def clean_first_name(self):
+        value = self.cleaned_data["first_name"].strip()
+        return " ".join(part.capitalize() for part in value.split())
+
+    def clean_email(self):
+        email = (self.cleaned_data.get("email") or "").strip().lower()
+        return email
 
     def _generate_member_code(self, mutuelle):
         slug_prefix = "".join(char for char in mutuelle.slug.upper() if char.isalnum())[:4] or "MEMB"
@@ -286,42 +589,76 @@ class MemberCreateForm(StyledModelForm):
 
     def save(self, commit=True):
         instance = super().save(commit=False)
+        # Mutuelle injectée par la vue (jamais saisie par l'utilisateur)
+        if self._mutuelle and not instance.mutuelle_id:
+            instance.mutuelle = self._mutuelle
         instance.member_code = (instance.member_code or "").strip().upper()
         if not instance.member_code:
             instance.member_code = self._generate_member_code(instance.mutuelle)
         instance.qr_token = f"qr-{instance.member_code.lower()}-{uuid.uuid4().hex[:8]}"
-        instance.joined_at = timezone.now().date()
+        if not instance.joined_at:
+            instance.joined_at = timezone.now().date()
         if commit:
             instance.save()
         return instance
 
 
 class FinancialProfileForm(StyledModelForm):
-    member = forms.ModelChoiceField(queryset=Member.all_objects.select_related("mutuelle"), label="Membre")
+    """Profil financier : revenus, charges, dettes, situation pro.
+
+    Synchronise automatiquement `dependents_count` et `professional_seniority_months`
+    depuis le membre si déjà saisis sur sa fiche.
+    """
+
+    member = forms.ModelChoiceField(
+        queryset=Member.all_objects.select_related("mutuelle"),
+        label="Membre",
+    )
 
     class Meta:
         model = MemberFinancialProfile
         fields = [
             "member",
+            # Revenus
             "net_monthly_salary",
             "complementary_income",
-            "fixed_charges",
             "pensions",
+            # Charges
+            "fixed_charges",
+            "existing_loan_payments",
+            "other_debts",
+            "pensions_paid",
             "mutual_contributions",
+            # Situation
             "dependents_count",
             "professional_seniority_months",
             "contract_type",
             "employment_type",
             "risk_level",
         ]
+        widgets = {
+            "net_monthly_salary": forms.NumberInput(attrs={"step": "0.01", "min": "0"}),
+            "complementary_income": forms.NumberInput(attrs={"step": "0.01", "min": "0"}),
+            "pensions": forms.NumberInput(attrs={"step": "0.01", "min": "0"}),
+            "fixed_charges": forms.NumberInput(attrs={"step": "0.01", "min": "0"}),
+            "existing_loan_payments": forms.NumberInput(attrs={"step": "0.01", "min": "0"}),
+            "other_debts": forms.NumberInput(attrs={"step": "0.01", "min": "0"}),
+            "pensions_paid": forms.NumberInput(attrs={"step": "0.01", "min": "0"}),
+            "mutual_contributions": forms.NumberInput(attrs={"step": "0.01", "min": "0"}),
+            "dependents_count": forms.NumberInput(attrs={"min": 0, "step": 1}),
+            "professional_seniority_months": forms.NumberInput(attrs={"min": 0, "step": 1}),
+        }
         labels = {
-            "net_monthly_salary": "Salaire net mensuel",
+            "net_monthly_salary": "Revenu mensuel net",
             "complementary_income": "Revenus complémentaires",
-            "fixed_charges": "Charges fixes",
-            "pensions": "Pensions",
+            "pensions": "Pensions reçues",
+            "fixed_charges": "Charges mensuelles fixes",
+            "existing_loan_payments": "Prêts en cours (mensualité)",
+            "other_debts": "Autres dettes mensualisées",
+            "pensions_paid": "Pensions versées",
             "mutual_contributions": "Cotisations mutuelle",
             "dependents_count": "Personnes à charge",
-            "professional_seniority_months": "Ancienneté professionnelle (mois)",
+            "professional_seniority_months": "Ancienneté (mois)",
             "contract_type": "Type de contrat",
             "employment_type": "Statut professionnel",
             "risk_level": "Niveau de risque",
@@ -329,7 +666,9 @@ class FinancialProfileForm(StyledModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["member"].queryset = Member.all_objects.filter(financial_profile__isnull=True).select_related("mutuelle")
+        self.fields["member"].queryset = (
+            Member.all_objects.filter(financial_profile__isnull=True).select_related("mutuelle")
+        )
         self._style_fields()
 
 
