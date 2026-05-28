@@ -1,0 +1,50 @@
+# Secrets et configuration locale — NE JAMAIS embarquer dans l'image
+.env
+.env.*
+!.env.example
+!.env.local.example
+
+# Caches et build
+__pycache__/
+*.py[cod]
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Données locales
+db.sqlite3
+db.sqlite3-journal
+media/
+staticfiles/
+logs/
+
+# Virtualenvs
+.venv/
+envi/
+venv/
+env/
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Git
+.git/
+.github/
+.gitignore
+
+# Documentation et tests si pas utile dans l'image
+docs/
+tests/
+*.md
+!README.md
+
+# Dockerfile lui-même + compose
+docker-compose*.yml
+Dockerfile*

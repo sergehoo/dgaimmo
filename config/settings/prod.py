@@ -4,11 +4,22 @@ Utilisé quand DJANGO_ENV=prod ou DJANGO_DEBUG=0.
 
 Hardening :
 - DEBUG=False forcé
-- Validation stricte du SECRET_KEY et ALLOWED_HOSTS
+- Validation stricte du SECRET_KEY et ALLOWED_HOSTS (en mode "runtime")
 - HTTPS / HSTS / cookies sécurisés activés
 - Throttling resserré
 - Logging applicatif file + console
+
+Build-time exemption
+---------------------
+Les commandes ``collectstatic``, ``makemigrations``, ``makemessages``,
+``compress``, ``check --deploy`` n'ont besoin d'aucun secret réel. On les
+détecte via ``sys.argv`` pour assouplir la validation et permettre le
+``RUN python manage.py collectstatic`` dans le Dockerfile sans devoir
+exposer les vrais secrets de production au build.
 """
+
+import sys
+import warnings
 
 from django.core.exceptions import ImproperlyConfigured
 
@@ -22,6 +33,32 @@ from .base import (
 
 DEBUG = False
 
+# --- Détection des commandes "build-time" ---
+_BUILD_COMMANDS = {
+    "collectstatic",
+    "makemigrations",
+    "makemessages",
+    "compilemessages",
+    "compress",
+    "check",            # check seul (sans --deploy) tolère le dummy
+    "spectacular",      # drf-spectacular generate
+    "diffsettings",
+    "showmigrations",
+}
+_BUILD_MODE = (
+    env_bool("DJANGO_BUILD_MODE")
+    or any(arg in _BUILD_COMMANDS for arg in sys.argv[1:2])
+)
+
+
+def _fail_or_warn(message: str):
+    """Lève ImproperlyConfigured en runtime, n'émet qu'un warning en build."""
+    if _BUILD_MODE:
+        warnings.warn(f"[MutuelleX][build-mode] {message}", RuntimeWarning, stacklevel=2)
+    else:
+        raise ImproperlyConfigured(message)
+
+
 # Validation du SECRET_KEY
 _UNSAFE_KEYS = {
     "",
@@ -31,20 +68,27 @@ _UNSAFE_KEYS = {
 }
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "")
 if SECRET_KEY in _UNSAFE_KEYS or len(SECRET_KEY) < 50:
-    raise ImproperlyConfigured(
+    _fail_or_warn(
         "DJANGO_SECRET_KEY must be a unique value of at least 50 characters in production."
     )
+    # Fournit un dummy build-time pour que collectstatic puisse continuer
+    if _BUILD_MODE and (SECRET_KEY in _UNSAFE_KEYS or len(SECRET_KEY) < 50):
+        SECRET_KEY = "build-time-dummy-secret-key-NOT-USED-IN-RUNTIME-mutuellex-min50chars"
 
-# Hosts obligatoires
+# Hosts obligatoires (sauf build)
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS")
 if not ALLOWED_HOSTS or "*" in ALLOWED_HOSTS:
-    raise ImproperlyConfigured(
+    _fail_or_warn(
         "DJANGO_ALLOWED_HOSTS must list explicit domains in production (no '*')."
     )
+    if _BUILD_MODE and not ALLOWED_HOSTS:
+        ALLOWED_HOSTS = ["build.local"]
 
 CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS")
 if not CSRF_TRUSTED_ORIGINS:
-    raise ImproperlyConfigured("CSRF_TRUSTED_ORIGINS is required in production.")
+    _fail_or_warn("CSRF_TRUSTED_ORIGINS is required in production.")
+    if _BUILD_MODE:
+        CSRF_TRUSTED_ORIGINS = ["https://build.local"]
 
 CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS")
 CORS_ALLOW_ALL_ORIGINS = False
