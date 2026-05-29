@@ -206,7 +206,7 @@ class MutuelleCreateForm(StyledModelForm):
         # Placeholder UX premium
         placeholders = {
             "name": "Ex. Mutuelle Habitat Cocody",
-            "organization_name": "Ex. Kaydan Groupe SARL",
+            "organization_name": "Ex. MutuelleX SARL",
             "legal_name": "Dénomination officielle (facultatif)",
             "estimated_members_count": "Ex. 250",
             "contact_last_name": "OGAH",
@@ -333,7 +333,7 @@ class PublicMutuelleSignupForm(forms.Form):
         self.fields["currency"].widget.attrs.setdefault("maxlength", "3")
         # Placeholders UX
         self.fields["mutuelle_name"].widget.attrs.setdefault("placeholder", "Ex. Mutuelle Habitat Cocody")
-        self.fields["organization_name"].widget.attrs.setdefault("placeholder", "Ex. Kaydan Groupe SARL")
+        self.fields["organization_name"].widget.attrs.setdefault("placeholder", "Ex. SocieteX SARL")
         self.fields["estimated_members_count"].widget.attrs.setdefault("placeholder", "Ex. 250")
         self.fields["last_name"].widget.attrs.setdefault("placeholder", "OGAH")
         self.fields["first_name"].widget.attrs.setdefault("placeholder", "Serge")
@@ -546,7 +546,7 @@ class MemberCreateForm(StyledModelForm):
             "email": "membre@email.ci",
             "birth_place": "Abidjan, CI",
             "national_id": "CI001234567",
-            "employer": "Kaydan Groupe SARL",
+            "employer": "SocieteX SARL",
             "job_function": "Responsable RH, Comptable, Ingénieur...",
             "spouse_name": "Nom et prénoms du conjoint",
             "bank_account_number": "CI93 CI16 0103 0000 0000 0000 0000",

@@ -21,7 +21,7 @@ from .base import (
 )
 
 DEBUG = True
-
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "")
 # Hosts : on accepte les requêtes locales communes même sans config explicite
 _HOSTS = env_list("DJANGO_ALLOWED_HOSTS")
 DEFAULT_DEV_HOSTS = ["localhost", "127.0.0.1", "0.0.0.0", "[::1]", "*.localhost"]

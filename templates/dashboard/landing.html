@@ -64,10 +64,10 @@
             La plateforme qui transforme les mutuelles en <span class="text-[#009f5b]">puissance immobilière</span>.
           </h1>
           <p class="mt-7 max-w-2xl text-lg font-semibold leading-8 text-[#536484]">
-            DGA-IMO360 transforme les mutuelles, coopératives et entreprises en réseaux de financement collectif : membres qualifiés, quotité cessible, programmes immobiliers, banques et promoteurs dans une seule plateforme.
+            DGA-Mutuelle transforme les mutuelles, coopératives et entreprises en réseaux de financement collectif : membres qualifiés, quotité cessible, programmes immobiliers, banques et promoteurs dans une seule plateforme.
           </p>
           <div class="mt-8 flex flex-wrap gap-4">
-            <a href="{% url 'public-mutuelle-signup' %}" class="rounded-2xl bg-[#003b98] px-7 py-4 text-sm font-black text-white no-underline shadow-2xl shadow-blue-900/25">Démarrer une mutuelle</a>
+            <a href="{% url 'public-mutuelle-signup' %}" class="rounded-2xl bg-[#003b98] px-7 py-4 text-sm font-black text-white no-underline shadow-2xl shadow-blue-900/25">Créer une mutuelle</a>
             <a href="#plateforme" class="rounded-2xl border border-[#d9e4f5] bg-white px-7 py-4 text-sm font-black text-[#06194a] no-underline shadow-sm">Voir la plateforme</a>
           </div>
           <div class="mt-10 grid max-w-2xl gap-3 sm:grid-cols-3">
@@ -132,7 +132,7 @@
         <div>
           <span class="text-xs font-black uppercase tracking-[.16em] text-[#caff3d]">Quotité cessible</span>
           <h2 class="mt-4 text-4xl font-black leading-tight md:text-5xl">La décision ne part plus d’une intuition, mais d’une capacité réelle.</h2>
-          <p class="mt-5 text-lg leading-8 text-white/70">DGA-IMO360 calcule la mensualité maximale par membre, puis consolide la capacité de toute la mutuelle pour dimensionner un programme immobilier collectif.</p>
+          <p class="mt-5 text-lg leading-8 text-white/70">DGA-Mutuelle calcule la mensualité maximale par membre, puis consolide la capacité de toute la mutuelle pour dimensionner un programme immobilier collectif.</p>
           {% if user.is_authenticated %}
             <a href="{% url 'create-simulation' %}" class="mt-8 inline-flex rounded-2xl bg-[#caff3d] px-6 py-4 text-sm font-black text-[#06194a] no-underline">Lancer une simulation</a>
           {% else %}
@@ -198,7 +198,7 @@
             {% endif %}
           </div>
         </div>
-        <img class="h-full min-h-[320px] w-full object-cover" src="https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&w=900&q=85" alt="Conseillers DGA-IMO360">
+        <img class="h-full min-h-[320px] w-full object-cover" src="{% static 'img/african-american-business-woman-working-computer-bar.jpg' %}" alt="Conseillers DGA-Mutuelle">
       </div>
     </section>
   </main>
