@@ -13,8 +13,8 @@
       <nav class="hidden items-center gap-7 text-sm font-extrabold text-[#172b5f] lg:flex">
         <a href="#reseau">Réseau</a>
         <a href="#quotite">Quotité</a>
+        <a href="#fonctionnement">Fonctionnement</a>
         <a href="#projets">Projets</a>
-        <a href="#plateforme">Plateforme</a>
         <a href="#securite">Sécurité</a>
       </nav>
       <div class="hidden items-center gap-3 sm:flex">
@@ -39,8 +39,8 @@
       <div class="grid gap-2 text-sm font-black text-[#172b5f]">
         <a class="rounded-xl px-3 py-3 hover:bg-[#f3f7ff]" href="#reseau">Réseau</a>
         <a class="rounded-xl px-3 py-3 hover:bg-[#f3f7ff]" href="#quotite">Quotité</a>
+        <a class="rounded-xl px-3 py-3 hover:bg-[#f3f7ff]" href="#fonctionnement">Fonctionnement</a>
         <a class="rounded-xl px-3 py-3 hover:bg-[#f3f7ff]" href="#projets">Projets</a>
-        <a class="rounded-xl px-3 py-3 hover:bg-[#f3f7ff]" href="#plateforme">Plateforme</a>
         {% if user.is_authenticated %}
           <a class="rounded-xl bg-[#003b98] px-3 py-3 text-white" href="{% url 'dashboard-home' %}">Ma console</a>
           <form method="post" action="{% url 'logout' %}" class="m-0">
@@ -144,6 +144,88 @@
           <div class="rounded-3xl bg-white p-6 text-[#06194a]"><span class="text-xs font-black uppercase text-[#536484]">Mutuelle</span><b class="mt-4 block text-3xl">3,25 Md FCFA</b><p class="mt-2 text-sm font-bold text-[#536484]">Capacité d’emprunt collective pour négociation bancaire.</p></div>
           <div class="rounded-3xl bg-[#caff3d] p-6 text-[#06194a]"><span class="text-xs font-black uppercase text-[#31430b]">Risque</span><b class="mt-4 block text-3xl">78/100</b><p class="mt-2 text-sm font-bold text-[#31430b]">Score global basé sur la régularité, KYC, solvabilité et historique.</p></div>
           <div class="rounded-3xl bg-white/10 p-6"><span class="text-xs font-black uppercase text-white/50">Amortissement</span><b class="mt-4 block text-3xl">120 mois</b><p class="mt-2 text-sm font-bold text-white/70">Période d’amortissement moyenne suivie par membre et par mutuelle.</p></div>
+        </div>
+      </div>
+    </section>
+
+
+    <section id="fonctionnement" class="mx-auto max-w-[1320px] px-5 py-24 lg:px-8">
+      <div class="mb-14 max-w-3xl">
+        <span class="inline-flex rounded-full border border-[#dce8f8] bg-white px-4 py-2 text-xs font-black uppercase tracking-[.16em] text-[#0b55d9] shadow-sm">Comment ça fonctionne ?</span>
+        <h2 class="mt-6 text-4xl font-black leading-tight md:text-5xl">De la création de votre mutuelle à la livraison de votre projet, en 4 étapes.</h2>
+        <p class="mt-5 text-lg leading-8 text-[#536484]">Un parcours structuré et guidé qui mobilise vos membres, calcule la capacité collective et sécurise le financement immobilier.</p>
+      </div>
+
+      <div class="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+
+        {# Étape 1 #}
+        <article class="group relative flex flex-col rounded-[32px] border border-[#e5edf8] bg-white p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-2xl hover:shadow-blue-950/10">
+          <div class="absolute -top-5 left-7 grid h-12 w-12 place-items-center rounded-2xl bg-[#003b98] text-lg font-black text-white shadow-lg shadow-blue-900/30">01</div>
+          <div class="mt-6 grid h-14 w-14 place-items-center rounded-2xl bg-[#eaf2ff] text-3xl">🏛️</div>
+          <h3 class="mt-5 text-xl font-black leading-tight">Créez votre mutuelle</h3>
+          <p class="mt-3 text-sm font-semibold leading-6 text-[#536484]">Identifiez l'organisation porteuse, dimensionnez le projet, choisissez vos objectifs immobiliers (terrain, maison, immeuble…) et désignez le contact référent.</p>
+          <ul class="mt-5 grid gap-2 text-xs font-bold text-[#06337d]">
+            <li class="flex items-start gap-2"><span class="text-[#0aa25f]">✓</span> Onboarding guidé en 4 étapes</li>
+            <li class="flex items-start gap-2"><span class="text-[#0aa25f]">✓</span> Branding personnalisé (logo, couleurs)</li>
+            <li class="flex items-start gap-2"><span class="text-[#0aa25f]">✓</span> Espace tenant isolé, sécurisé</li>
+          </ul>
+        </article>
+
+        {# Étape 2 #}
+        <article class="group relative flex flex-col rounded-[32px] border border-[#e5edf8] bg-white p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-2xl hover:shadow-blue-950/10">
+          <div class="absolute -top-5 left-7 grid h-12 w-12 place-items-center rounded-2xl bg-[#0b55d9] text-lg font-black text-white shadow-lg shadow-blue-900/30">02</div>
+          <div class="mt-6 grid h-14 w-14 place-items-center rounded-2xl bg-[#e8fff2] text-3xl">👥</div>
+          <h3 class="mt-5 text-xl font-black leading-tight">Enrôlez vos membres</h3>
+          <p class="mt-3 text-sm font-semibold leading-6 text-[#536484]">Ajoutez les mutualistes avec leur fiche complète : identité, situation matrimoniale, profession, revenus, charges, prêts en cours et banque affiliée.</p>
+          <ul class="mt-5 grid gap-2 text-xs font-bold text-[#06337d]">
+            <li class="flex items-start gap-2"><span class="text-[#0aa25f]">✓</span> Profil financier détaillé par membre</li>
+            <li class="flex items-start gap-2"><span class="text-[#0aa25f]">✓</span> KYC, QR code, carte digitale</li>
+            <li class="flex items-start gap-2"><span class="text-[#0aa25f]">✓</span> Mandataires terrain &amp; collecte offline</li>
+          </ul>
+        </article>
+
+        {# Étape 3 #}
+        <article class="group relative flex flex-col rounded-[32px] border border-[#e5edf8] bg-white p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-2xl hover:shadow-blue-950/10">
+          <div class="absolute -top-5 left-7 grid h-12 w-12 place-items-center rounded-2xl bg-[#7c3aed] text-lg font-black text-white shadow-lg shadow-purple-900/30">03</div>
+          <div class="mt-6 grid h-14 w-14 place-items-center rounded-2xl bg-[#ede9fe] text-3xl">📊</div>
+          <h3 class="mt-5 text-xl font-black leading-tight">Simulez quotité &amp; scoring</h3>
+          <p class="mt-3 text-sm font-semibold leading-6 text-[#536484]">La plateforme calcule la mensualité maximale et le reste à vivre de chaque membre, agrège la capacité collective et produit le score de solvabilité de la mutuelle.</p>
+          <ul class="mt-5 grid gap-2 text-xs font-bold text-[#06337d]">
+            <li class="flex items-start gap-2"><span class="text-[#0aa25f]">✓</span> Quotité cessible automatique</li>
+            <li class="flex items-start gap-2"><span class="text-[#0aa25f]">✓</span> Scoring membre + mutuelle + programme</li>
+            <li class="flex items-start gap-2"><span class="text-[#0aa25f]">✓</span> Décision éligibilité assistée par IA</li>
+          </ul>
+        </article>
+
+        {# Étape 4 #}
+        <article class="group relative flex flex-col rounded-[32px] bg-[#06194a] p-7 text-white shadow-2xl shadow-blue-950/30 transition hover:-translate-y-1">
+          <div class="absolute -top-5 left-7 grid h-12 w-12 place-items-center rounded-2xl bg-[#caff3d] text-lg font-black text-[#06194a] shadow-lg shadow-emerald-900/30">04</div>
+          <div class="mt-6 grid h-14 w-14 place-items-center rounded-2xl bg-white/10 text-3xl">🏗️</div>
+          <h3 class="mt-5 text-xl font-black leading-tight">Financez &amp; livrez le projet</h3>
+          <p class="mt-3 text-sm font-semibold leading-6 text-white/70">Choisissez votre montage (mutuelle, bancaire, mixte), constituez le dossier banque, réservez les lots, suivez les décaissements et clôturez le programme.</p>
+          <ul class="mt-5 grid gap-2 text-xs font-bold text-[#cfff3d]">
+            <li class="flex items-start gap-2"><span class="text-[#caff3d]">✓</span> Comparateur banque / mutuelle / mixte</li>
+            <li class="flex items-start gap-2"><span class="text-[#caff3d]">✓</span> Plan de remboursement automatique</li>
+            <li class="flex items-start gap-2"><span class="text-[#caff3d]">✓</span> Mobile Money (Orange, MTN, Wave, Moov)</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="mt-12 flex flex-wrap items-center justify-between gap-5 rounded-3xl border border-[#e5edf8] bg-[#f7faff] p-6">
+        <div class="flex items-center gap-4">
+          <span class="grid h-12 w-12 place-items-center rounded-2xl bg-[#0aa25f] text-xl text-white">⏱️</span>
+          <div>
+            <b class="block text-lg font-black text-[#06194a]">Activez votre mutuelle en moins de 10 minutes.</b>
+            <small class="block text-sm font-bold text-[#536484]">Aucun engagement, aucun setup technique. Vous gardez la main sur vos données.</small>
+          </div>
+        </div>
+        <div class="flex flex-wrap gap-3">
+          {% if user.is_authenticated %}
+            <a href="{% url 'dashboard-home' %}" class="rounded-xl bg-[#003b98] px-5 py-3 text-sm font-black text-white no-underline shadow-lg shadow-blue-900/20">Ouvrir ma console</a>
+          {% else %}
+            <a href="{% url 'public-mutuelle-signup' %}" class="rounded-xl bg-[#0bbf63] px-5 py-3 text-sm font-black text-white no-underline shadow-lg shadow-emerald-900/20">Démarrer maintenant</a>
+            <a href="{% url 'login' %}" class="rounded-xl border border-[#dce7f6] bg-white px-5 py-3 text-sm font-black text-[#06337d] no-underline">J'ai déjà un compte</a>
+          {% endif %}
         </div>
       </div>
     </section>
