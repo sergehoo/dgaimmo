@@ -1,0 +1,104 @@
+{% extends "dashboard/console_base.html" %}
+{% block console_content %}
+<div class="mb-7 flex flex-wrap items-center justify-between gap-4">
+  <div>
+    <p class="text-sm font-bold text-[#536484]">MutuelleX · Workflow membre</p>
+    <h1 class="text-3xl font-black"><i class="fa-solid fa-file-import text-[#0aa25f]"></i> Import en masse de membres</h1>
+    <p class="mt-2 max-w-3xl text-sm font-semibold text-[#536484]">Uploadez un fichier Excel (.xlsx) ou CSV pour créer plusieurs mutualistes d'un coup. Le fichier doit contenir au minimum les colonnes <b>Nom</b>, <b>Prénom(s)</b>, <b>Téléphone</b>.</p>
+  </div>
+  <div class="flex gap-2">
+    <a href="{% url 'members-center' %}" class="rounded-xl border border-[#dce7f6] bg-white px-5 py-3 text-sm font-black text-[#06337d] no-underline">Retour</a>
+    <a href="{% url 'create-member' %}" class="rounded-xl border border-[#dce7f6] bg-white px-5 py-3 text-sm font-black text-[#0b55d9] no-underline"><i class="fa-solid fa-user-plus"></i> Saisie manuelle</a>
+  </div>
+</div>
+
+{% if messages %}
+<div class="mb-5 grid gap-3">
+  {% for msg in messages %}
+    <div class="flex items-start gap-3 rounded-2xl border p-4 text-sm font-bold
+      {% if 'warning' in msg.tags %}border-[#facc15] bg-[#fff7df] text-[#854d0e]
+      {% elif 'error' in msg.tags %}border-red-200 bg-red-50 text-red-700
+      {% elif 'success' in msg.tags %}border-[#86efac] bg-[#e8fff2] text-[#0b9f5b]
+      {% else %}border-[#dbe6f5] bg-[#f7faff] text-[#06337d]{% endif %}">
+      <i class="fa-solid {% if 'warning' in msg.tags %}fa-triangle-exclamation{% elif 'error' in msg.tags %}fa-circle-xmark{% elif 'success' in msg.tags %}fa-circle-check{% else %}fa-circle-info{% endif %} mt-0.5"></i>
+      <div>{{ msg }}</div>
+    </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<section class="grid gap-6 xl:grid-cols-[1fr_.45fr]">
+  <form method="post" enctype="multipart/form-data" class="rounded-2xl border border-[#e5edf8] bg-white p-7 shadow-sm">
+    {% csrf_token %}
+
+    <div class="mb-6 flex items-center gap-4 rounded-2xl border border-[#dbe6f5] bg-[#f7faff] p-4">
+      <span class="grid h-12 w-12 flex-none place-items-center rounded-xl bg-[#0b55d9] text-sm font-black text-white">{{ active_mutuelle.name|slice:":1"|upper }}</span>
+      <div class="min-w-0">
+        <b class="block text-base">{{ active_mutuelle.name }}</b>
+        <small class="block text-xs font-bold text-[#536484]">Les membres seront rattachés automatiquement à cette mutuelle.</small>
+      </div>
+    </div>
+
+    <h2 class="mb-3 text-lg font-black text-[#06194a]"><i class="fa-solid fa-cloud-arrow-up text-[#0aa25f]"></i> Fichier à importer</h2>
+    <div>
+      <label class="mb-2 block text-sm font-black text-[#06194a]" for="{{ form.upload.id_for_label }}">{{ form.upload.label }} <span class="text-red-500">*</span></label>
+      {{ form.upload }}
+      {% if form.upload.help_text %}<p class="mt-2 text-xs font-semibold text-[#536484]">{{ form.upload.help_text }}</p>{% endif %}
+      {% for error in form.upload.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+    </div>
+
+    <div class="mt-6 rounded-2xl bg-[#fefce8] p-4 text-xs font-bold text-[#854d0e]">
+      <i class="fa-solid fa-lightbulb"></i> Astuce : utilisez l'export Excel d'une mutuelle existante comme modèle. Les doublons (téléphone ou email déjà enregistrés) sont automatiquement ignorés.
+    </div>
+
+    <div class="mt-7 flex flex-wrap gap-3">
+      <button type="submit" class="rounded-xl bg-[#0b55d9] px-6 py-4 text-sm font-black text-white shadow-lg shadow-blue-900/20"><i class="fa-solid fa-upload"></i> Importer les membres</button>
+      <a href="{% url 'members-center' %}" class="rounded-xl border border-[#dce7f6] bg-white px-6 py-4 text-sm font-black text-[#06194a] no-underline">Annuler</a>
+    </div>
+  </form>
+
+  <aside class="rounded-2xl bg-[#06194a] p-7 text-white shadow-2xl shadow-blue-950/15">
+    <span class="text-xs font-black uppercase text-[#72e7a6]"><i class="fa-solid fa-table-list"></i> Format attendu</span>
+    <h2 class="mt-4 text-xl font-black">Colonnes du fichier</h2>
+    <div class="mt-5 grid gap-2 text-xs">
+      <div class="rounded-xl bg-white/10 p-3"><b class="text-[#cfff3d]">Obligatoires</b><span class="block mt-1">Nom · Prénom(s) · Téléphone</span></div>
+      <div class="rounded-xl bg-white/10 p-3"><b class="text-white">Optionnelles</b><span class="block mt-1">Email · Date de naissance · Genre · CNI/Passeport · Lieu de naissance · Situation matrimoniale · Personnes à charge · Code membre</span></div>
+      <div class="rounded-xl bg-white/10 p-3 text-[#cfff3d]"><i class="fa-solid fa-info-circle"></i> Le code membre est généré automatiquement si absent.</div>
+    </div>
+  </aside>
+</section>
+
+{% if report %}
+<section class="mt-7 rounded-2xl border border-[#e5edf8] bg-white p-7 shadow-sm">
+  <h2 class="text-xl font-black"><i class="fa-solid fa-clipboard-check text-[#0b55d9]"></i> Rapport d'import</h2>
+  <div class="mt-5 grid gap-4 sm:grid-cols-3">
+    <div class="rounded-2xl bg-[#e8fff2] p-5"><span class="text-xs font-black uppercase text-[#0b9f5b]"><i class="fa-solid fa-circle-check"></i> Créés</span><b class="mt-2 block text-3xl text-[#0b9f5b]">{{ report.created_count|intcomma }}</b></div>
+    <div class="rounded-2xl bg-[#fff7df] p-5"><span class="text-xs font-black uppercase text-[#b56a00]"><i class="fa-solid fa-clone"></i> Doublons ignorés</span><b class="mt-2 block text-3xl text-[#b56a00]">{{ report.skipped_duplicates|intcomma }}</b></div>
+    <div class="rounded-2xl bg-red-50 p-5"><span class="text-xs font-black uppercase text-red-700"><i class="fa-solid fa-triangle-exclamation"></i> Erreurs</span><b class="mt-2 block text-3xl text-red-700">{{ report.error_count|intcomma }}</b></div>
+  </div>
+
+  {% if report.created %}
+  <h3 class="mt-7 mb-3 text-sm font-black uppercase text-[#667899]">Membres créés</h3>
+  <div class="grid gap-2">
+    {% for m in report.created %}
+      <a href="{% url 'member-detail' m.id %}" class="flex items-center justify-between rounded-xl bg-[#f7faff] p-3 no-underline">
+        <div><b class="text-[#06194a]">{{ m.last_name|upper }} {{ m.first_name }}</b><small class="block text-xs font-bold text-[#536484]">{{ m.member_code }} · {{ m.phone }}{% if m.email %} · {{ m.email }}{% endif %}</small></div>
+        <i class="fa-solid fa-arrow-right text-[#0b55d9]"></i>
+      </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if report.errors %}
+  <h3 class="mt-7 mb-3 text-sm font-black uppercase text-red-700">Lignes en erreur</h3>
+  <div class="grid gap-2">
+    {% for err in report.errors %}
+      <div class="rounded-xl bg-red-50 p-3 text-sm">
+        <b class="text-red-700">Ligne {{ err.line }}</b> · <span class="font-mono text-xs">{{ err.field }}</span> · {{ err.message }}
+      </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+{% endblock %}

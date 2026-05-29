@@ -82,3 +82,53 @@ class TenantQuota(TimeStampedModel):
 
     def can_add_member(self, current_member_count: int) -> bool:
         return current_member_count < self.max_members
+
+
+class ContactRequest(TimeStampedModel):
+    """Demande de contact remontée depuis la landing page (modal public)."""
+
+    class Status(models.TextChoices):
+        NEW = "new", "Nouvelle"
+        IN_PROGRESS = "in_progress", "En traitement"
+        RESOLVED = "resolved", "Résolue"
+        SPAM = "spam", "Spam / ignorée"
+
+    class Subject(models.TextChoices):
+        INFO = "info", "Demande d'information"
+        DEMO = "demo", "Demande de démo"
+        PARTNERSHIP = "partnership", "Partenariat"
+        SUPPORT = "support", "Support technique"
+        OTHER = "other", "Autre"
+
+    full_name = models.CharField("Nom complet", max_length=180)
+    email = models.EmailField("Email", db_index=True)
+    phone = models.CharField("Téléphone", max_length=32, blank=True)
+    organization = models.CharField("Organisation / Mutuelle", max_length=180, blank=True)
+    subject = models.CharField(
+        "Sujet", max_length=24, choices=Subject.choices, default=Subject.INFO, db_index=True
+    )
+    message = models.TextField("Message")
+    status = models.CharField(
+        "Statut", max_length=24, choices=Status.choices, default=Status.NEW, db_index=True
+    )
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+    processed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="contact_requests_processed",
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["status", "created_at"]),
+            models.Index(fields=["email", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.full_name} <{self.email}> · {self.get_subject_display()}"

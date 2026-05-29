@@ -1,0 +1,94 @@
+{% extends "base/app.html" %}
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-[#f7fbff] via-white to-[#eef4ff] text-[#06194a]">
+  <div class="mx-auto max-w-[920px] px-5 py-10">
+    <header class="rounded-2xl border border-[#dfe9f8] bg-white p-7 shadow-sm">
+      <div class="flex items-center gap-4">
+        <span class="grid h-14 w-14 place-items-center rounded-2xl text-2xl font-black text-white" style="background: {{ active_mutuelle.primary_color|default:'#003b98' }}">
+          {{ active_mutuelle.name|slice:":1"|upper }}
+        </span>
+        <div>
+          <p class="text-xs font-black uppercase tracking-[.14em] text-[#0b55d9]">Invitation à rejoindre</p>
+          <h1 class="text-2xl font-black">{{ active_mutuelle.name }}</h1>
+        </div>
+      </div>
+      {% if invitation.message %}
+      <div class="mt-5 rounded-2xl border-l-4 border-[#0b55d9] bg-[#f7faff] p-4 text-sm font-semibold leading-6 text-[#06337d]">
+        <i class="fa-solid fa-quote-left"></i> {{ invitation.message|linebreaksbr }}
+      </div>
+      {% endif %}
+    </header>
+
+    <section class="mt-6 rounded-2xl border border-[#e5edf8] bg-white p-7 shadow-sm">
+      <h2 class="mb-1 text-xl font-black"><i class="fa-solid fa-user-plus text-[#0aa25f]"></i> Complétez votre profil</h2>
+      <p class="mb-6 text-sm font-semibold text-[#536484]">Renseignez vos informations pour finaliser votre adhésion à la mutuelle.</p>
+
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+          <div class="mb-5 rounded-2xl bg-red-50 p-4 text-sm font-bold text-red-700">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        {# Identité minimale (les autres blocs du form sont affichés en compact) #}
+        <div class="grid gap-5 md:grid-cols-2">
+          <div>
+            <label class="mb-2 block text-sm font-black" for="{{ form.last_name.id_for_label }}">{{ form.last_name.label }} <span class="text-red-500">*</span></label>
+            {{ form.last_name }}
+            {% for error in form.last_name.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+          </div>
+          <div>
+            <label class="mb-2 block text-sm font-black" for="{{ form.first_name.id_for_label }}">{{ form.first_name.label }} <span class="text-red-500">*</span></label>
+            {{ form.first_name }}
+            {% for error in form.first_name.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+          </div>
+          <div>
+            <label class="mb-2 block text-sm font-black" for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>
+            {{ form.email }}
+            {% for error in form.email.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+          </div>
+          <div>
+            <label class="mb-2 block text-sm font-black" for="{{ form.phone.id_for_label }}">{{ form.phone.label }} <span class="text-red-500">*</span></label>
+            {{ form.phone }}
+            {% for error in form.phone.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+          </div>
+          <div>
+            <label class="mb-2 block text-sm font-black" for="{{ form.birth_date.id_for_label }}">{{ form.birth_date.label }}</label>
+            {{ form.birth_date }}
+            {% for error in form.birth_date.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+          </div>
+          <div>
+            <label class="mb-2 block text-sm font-black" for="{{ form.gender.id_for_label }}">{{ form.gender.label }}</label>
+            {{ form.gender }}
+            {% for error in form.gender.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+          </div>
+          <div>
+            <label class="mb-2 block text-sm font-black" for="{{ form.marital_status.id_for_label }}">{{ form.marital_status.label }}</label>
+            {{ form.marital_status }}
+            {% for error in form.marital_status.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+          </div>
+          <div>
+            <label class="mb-2 block text-sm font-black" for="{{ form.dependents_count.id_for_label }}">{{ form.dependents_count.label }}</label>
+            {{ form.dependents_count }}
+            {% for error in form.dependents_count.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+          </div>
+        </div>
+
+        {# Objectifs immobiliers (multi-select) #}
+        <h3 class="mt-7 mb-3 text-sm font-black uppercase text-[#0b55d9]"><i class="fa-solid fa-bullseye"></i> Mes objectifs immobiliers</h3>
+        <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 rounded-2xl border border-[#e5edf8] bg-[#f7faff] p-4">
+          {% for choice in form.real_estate_objective %}
+            <label class="flex cursor-pointer items-center gap-3 rounded-xl border border-transparent bg-white px-3 py-3 text-sm font-bold text-[#06194a] transition hover:border-[#0b55d9]">
+              {{ choice.tag }}
+              <span>{{ choice.choice_label }}</span>
+            </label>
+          {% endfor %}
+        </div>
+
+        <div class="mt-8 flex flex-wrap gap-3">
+          <button type="submit" class="rounded-2xl bg-[#0aa25f] px-7 py-4 text-sm font-black text-white shadow-xl shadow-emerald-900/20"><i class="fa-solid fa-circle-check"></i> {{ submit_label }}</button>
+        </div>
+      </form>
+    </section>
+  </div>
+</div>
+{% endblock %}

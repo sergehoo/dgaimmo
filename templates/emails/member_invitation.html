@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="fr">
+<head><meta charset="utf-8"><title>Invitation {{ mutuelle.name }}</title></head>
+<body style="margin:0;padding:0;background:#f7fbff;font-family:'Inter',Arial,sans-serif;color:#06194a">
+  <table width="100%" cellpadding="0" cellspacing="0" style="padding:32px 0">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:24px;box-shadow:0 12px 32px rgba(11,85,217,.08);overflow:hidden">
+        <tr><td style="background:{{ mutuelle.primary_color|default:'#003b98' }};padding:32px;color:#fff">
+          <h1 style="margin:0;font-size:24px;font-weight:900">{{ mutuelle.name }}</h1>
+          <p style="margin:8px 0 0;font-size:13px;font-weight:700;color:rgba(255,255,255,.8)">Invitation à rejoindre la mutuelle</p>
+        </td></tr>
+        <tr><td style="padding:32px">
+          <p style="margin:0 0 16px;font-size:16px">Bonjour,</p>
+          <p style="margin:0 0 16px;line-height:1.6">
+            Vous avez été invité(e) à rejoindre la mutuelle <b>{{ mutuelle.name }}</b> sur la plateforme MutuelleX.
+          </p>
+          {% if invitation.message %}
+          <div style="margin:16px 0;padding:16px;background:#f7faff;border-radius:12px;border-left:4px solid #0b55d9">
+            <p style="margin:0;font-size:14px;line-height:1.5"><i>{{ invitation.message|linebreaksbr }}</i></p>
+          </div>
+          {% endif %}
+          <p style="margin:24px 0;line-height:1.6">
+            Cliquez sur le bouton ci-dessous pour compléter votre profil et activer votre adhésion.
+          </p>
+          <p style="margin:0;text-align:center">
+            <a href="{{ accept_url }}" style="display:inline-block;padding:16px 32px;background:#003b98;color:#fff;text-decoration:none;border-radius:12px;font-weight:900;font-size:14px">
+              Compléter mon adhésion →
+            </a>
+          </p>
+          <p style="margin:24px 0 0;font-size:12px;color:#536484;line-height:1.6">
+            Si le bouton ne fonctionne pas, copiez ce lien dans votre navigateur :<br>
+            <a href="{{ accept_url }}" style="color:#0b55d9;word-break:break-all">{{ accept_url }}</a>
+          </p>
+          <p style="margin:16px 0 0;font-size:12px;color:#536484">
+            Ce lien expire le <b>{{ invitation.expires_at|date:"d/m/Y H:i" }}</b>.
+          </p>
+        </td></tr>
+        <tr><td style="background:#f7faff;padding:20px;text-align:center;font-size:11px;color:#667899">
+          Email envoyé via MutuelleX · {{ mutuelle.name }}
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>

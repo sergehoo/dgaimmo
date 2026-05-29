@@ -104,7 +104,6 @@
         {% if members_objectives_total_picks %} · {{ members_objectives_total_picks|intcomma }} sélection(s) cumulée(s){% endif %}.
       </p>
     </div>
-    <a href="{% url 'create-project' %}" class="rounded-xl bg-[#0b55d9] px-4 py-3 text-sm font-black text-white no-underline shadow-lg shadow-blue-900/20"><i class="fa-solid fa-plus"></i> Créer un programme</a>
   </div>
 
   {% if members_objectives_aggregated %}
@@ -170,9 +169,11 @@
         <h2 class="text-xl font-black">Liste des membres</h2>
         <p class="mt-1 text-sm font-bold text-[#536484]">{{ members_total|intcomma }} membre(s) · {{ members_kyc_validated|intcomma }} KYC validés · {{ members_delinquent|intcomma }} en retard</p>
       </div>
-      <div class="flex gap-2">
+      <div class="flex flex-wrap gap-2">
         <a href="{% url 'members-center' %}" class="rounded-xl bg-[#eaf2ff] px-4 py-2 text-xs font-black text-[#0b55d9] no-underline">Tous les membres</a>
-        <a href="{% url 'create-member' %}" class="rounded-xl bg-[#0b55d9] px-4 py-2 text-xs font-black text-white no-underline">+ Ajouter</a>
+        <a href="{% url 'import-members' %}" class="rounded-xl bg-[#e8fff2] px-4 py-2 text-xs font-black text-[#0aa25f] no-underline"><i class="fa-solid fa-file-import"></i> Importer Excel</a>
+        <a href="{% url 'send-member-invitations' %}" class="rounded-xl bg-[#ede9fe] px-4 py-2 text-xs font-black text-[#7c3aed] no-underline"><i class="fa-solid fa-envelope-open-text"></i> Inviter par email</a>
+        <a href="{% url 'create-member' %}" class="rounded-xl bg-[#0b55d9] px-4 py-2 text-xs font-black text-white no-underline"><i class="fa-solid fa-user-plus"></i> Ajouter</a>
       </div>
     </div>
     <div class="overflow-x-auto">

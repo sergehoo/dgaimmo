@@ -1,0 +1,30 @@
+{% extends "base/app.html" %}
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-[#f7fbff] via-white to-[#eef4ff] text-[#06194a]">
+  <div class="mx-auto flex max-w-[720px] flex-col items-center px-5 py-16">
+    <div class="w-full rounded-[32px] border border-[#e5edf8] bg-white p-10 text-center shadow-2xl shadow-blue-950/10">
+      {% if state == "success" %}
+        <span class="mx-auto grid h-20 w-20 place-items-center rounded-3xl bg-[#e8fff2] text-4xl text-[#0aa25f]"><i class="fa-solid fa-circle-check"></i></span>
+        <h1 class="mt-6 text-3xl font-black">Bienvenue dans {{ invitation.mutuelle.name }} !</h1>
+        <p class="mt-3 text-sm font-bold text-[#536484]">Votre adhésion est enregistrée. Code membre : <b class="font-mono text-[#0b55d9]">{{ member.member_code }}</b></p>
+        <p class="mt-4 text-sm font-semibold leading-6 text-[#536484]">L'équipe de la mutuelle vous contactera pour la suite (KYC, profil financier, première cotisation).</p>
+      {% elif state == "already_accepted" %}
+        <span class="mx-auto grid h-20 w-20 place-items-center rounded-3xl bg-[#eaf2ff] text-4xl text-[#0b55d9]"><i class="fa-solid fa-circle-info"></i></span>
+        <h1 class="mt-6 text-3xl font-black">Invitation déjà acceptée</h1>
+        <p class="mt-3 text-sm font-semibold leading-6 text-[#536484]">Cette invitation a déjà été utilisée pour rejoindre {{ invitation.mutuelle.name }}. Si vous pensez que c'est une erreur, contactez l'administrateur.</p>
+      {% elif state == "expired" %}
+        <span class="mx-auto grid h-20 w-20 place-items-center rounded-3xl bg-[#fff4e5] text-4xl text-[#b56a00]"><i class="fa-solid fa-clock"></i></span>
+        <h1 class="mt-6 text-3xl font-black">Lien expiré</h1>
+        <p class="mt-3 text-sm font-semibold leading-6 text-[#536484]">Le lien d'invitation pour {{ invitation.mutuelle.name }} a expiré ou a été annulé. Demandez à l'administrateur de la mutuelle un nouveau lien.</p>
+      {% endif %}
+
+      <div class="mt-8 flex flex-wrap justify-center gap-3">
+        <a href="/" class="rounded-2xl border border-[#dce7f6] bg-white px-6 py-3 text-sm font-black text-[#06337d] no-underline"><i class="fa-solid fa-house"></i> Retour à l'accueil</a>
+        {% if state == "success" %}
+          <a href="{% url 'login' %}" class="rounded-2xl bg-[#0b55d9] px-6 py-3 text-sm font-black text-white no-underline shadow-lg shadow-blue-900/20"><i class="fa-solid fa-right-to-bracket"></i> Se connecter</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

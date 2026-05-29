@@ -601,6 +601,144 @@ class MemberCreateForm(StyledModelForm):
         return instance
 
 
+class ContactRequestForm(forms.ModelForm):
+    """Formulaire public de contact (modal landing page).
+
+    - Honeypot anti-spam (champ ``website`` invisible aux humains).
+    - Stylé Tailwind via ``StyledModelForm`` indirect (classes inline).
+    """
+
+    # Honeypot
+    website = forms.CharField(required=False, widget=forms.TextInput(attrs={
+        "tabindex": "-1",
+        "autocomplete": "off",
+        "style": "position:absolute;left:-9999px;top:-9999px;",
+        "aria-hidden": "true",
+    }))
+
+    class Meta:
+        from core.models import ContactRequest
+
+        model = ContactRequest
+        fields = ["full_name", "email", "phone", "organization", "subject", "message"]
+        widgets = {
+            "message": forms.Textarea(attrs={"rows": 4}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for name, field in self.fields.items():
+            widget = field.widget
+            if name == "website":
+                continue
+            if isinstance(widget, forms.Textarea):
+                widget.attrs.setdefault("class", BASE_TEXTAREA)
+            elif isinstance(widget, forms.Select):
+                widget.attrs.setdefault("class", BASE_SELECT)
+            else:
+                widget.attrs.setdefault("class", BASE_INPUT)
+        placeholders = {
+            "full_name": "Nom et prénoms",
+            "email": "vous@organisation.ci",
+            "phone": "+225 07 00 00 00 00",
+            "organization": "Nom de votre mutuelle / entreprise",
+            "message": "Comment pouvons-nous vous aider ?",
+        }
+        for n, ph in placeholders.items():
+            if n in self.fields:
+                self.fields[n].widget.attrs.setdefault("placeholder", ph)
+
+    def clean_website(self):
+        # Honeypot : si rempli, c'est un bot
+        if self.cleaned_data.get("website"):
+            raise forms.ValidationError("Spam détecté.")
+        return ""
+
+
+class MemberImportForm(forms.Form):
+    """Upload d'un fichier Excel ou CSV pour créer en masse des membres."""
+
+    upload = forms.FileField(
+        label="Fichier .xlsx ou .csv",
+        help_text="Colonnes attendues : Nom, Prénom(s), Téléphone, Email, "
+                  "Date de naissance, Genre, CNI/Passeport, Lieu de naissance, "
+                  "Situation matrimoniale, Personnes à charge.",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["upload"].widget.attrs.setdefault(
+            "class",
+            "block w-full text-sm font-bold text-[#06194a] file:mr-4 file:rounded-xl "
+            "file:border-0 file:bg-[#0b55d9] file:px-5 file:py-3 file:text-sm "
+            "file:font-black file:text-white hover:file:bg-[#003b98]",
+        )
+        self.fields["upload"].widget.attrs.setdefault("accept", ".xlsx,.xlsm,.csv")
+
+    def clean_upload(self):
+        f = self.cleaned_data["upload"]
+        name = (f.name or "").lower()
+        if not (name.endswith(".xlsx") or name.endswith(".xlsm") or name.endswith(".csv")):
+            raise forms.ValidationError("Format non supporté. Utilisez .xlsx ou .csv.")
+        if f.size > 5 * 1024 * 1024:
+            raise forms.ValidationError("Le fichier dépasse 5 Mo.")
+        return f
+
+
+class MemberInvitationForm(forms.Form):
+    """Saisie de plusieurs adresses email pour envoi groupé d'invitations."""
+
+    emails = forms.CharField(
+        label="Emails des prospects",
+        widget=forms.Textarea(attrs={"rows": 4, "placeholder": "alice@example.com\nbob@example.com\n..."}),
+        help_text="Un email par ligne (ou séparés par virgules).",
+    )
+    message = forms.CharField(
+        label="Message personnalisé (optionnel)",
+        required=False,
+        widget=forms.Textarea(attrs={"rows": 3, "placeholder": "Bonjour, rejoignez notre mutuelle pour..."}),
+    )
+    ttl_days = forms.IntegerField(
+        label="Durée de validité du lien (jours)",
+        initial=14,
+        min_value=1,
+        max_value=90,
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["emails"].widget.attrs.setdefault("class", BASE_TEXTAREA)
+        self.fields["message"].widget.attrs.setdefault("class", BASE_TEXTAREA)
+        self.fields["ttl_days"].widget.attrs.setdefault("class", BASE_INPUT)
+
+    def clean_emails(self):
+        raw = self.cleaned_data["emails"]
+        # Split sur newlines, virgules, point-virgules
+        candidates = [
+            e.strip().lower()
+            for chunk in raw.split("\n")
+            for e in chunk.replace(";", ",").split(",")
+            if e.strip()
+        ]
+        seen = set()
+        unique_emails = []
+        from django.core.validators import validate_email
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
+        for email in candidates:
+            if email in seen:
+                continue
+            try:
+                validate_email(email)
+            except DjangoValidationError:
+                raise forms.ValidationError(f"Email invalide : {email}")
+            seen.add(email)
+            unique_emails.append(email)
+        if not unique_emails:
+            raise forms.ValidationError("Indiquez au moins une adresse email valide.")
+        return unique_emails
+
+
 class FinancialProfileForm(StyledModelForm):
     """Profil financier : revenus, charges, dettes, situation pro.
 

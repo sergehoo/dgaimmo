@@ -198,3 +198,99 @@ class KYCDocument(TenantModel):
     file = models.FileField(upload_to="members/kyc/")
     verified = models.BooleanField(default=False, db_index=True)
     ocr_payload = models.JSONField(default=dict, blank=True)
+
+
+import secrets as _secrets
+
+
+def _generate_invitation_token() -> str:
+    """URL-safe token de 32 caractères (256 bits)."""
+    return _secrets.token_urlsafe(32)
+
+
+class MemberInvitation(TenantModel):
+    """Invitation envoyée par email pour permettre à un prospect de
+    rejoindre une mutuelle via un lien sécurisé.
+
+    Workflow :
+    1. L'admin envoie une invitation (email + statut PENDING).
+    2. Le prospect clique sur le lien ``/rejoindre/<token>/``.
+    3. Il complète le formulaire d'auto-onboarding → un Member est créé.
+    4. L'invitation passe en ACCEPTED (avec ``member`` et ``used_at``).
+    """
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "En attente"
+        SENT = "sent", "Envoyée"
+        ACCEPTED = "accepted", "Acceptée"
+        EXPIRED = "expired", "Expirée"
+        CANCELLED = "cancelled", "Annulée"
+
+    email = models.EmailField("Email du prospect", db_index=True)
+    full_name = models.CharField(
+        "Nom complet (optionnel)",
+        max_length=180,
+        blank=True,
+        help_text="Pré-remplit le formulaire d'inscription du prospect.",
+    )
+    token = models.CharField(
+        max_length=64,
+        unique=True,
+        db_index=True,
+        default=_generate_invitation_token,
+    )
+    status = models.CharField(
+        max_length=24,
+        choices=Status.choices,
+        default=Status.PENDING,
+        db_index=True,
+    )
+    invited_by = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="member_invitations_sent",
+    )
+    member = models.ForeignKey(
+        Member,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_from_invitation",
+        help_text="Membre créé lorsque l'invitation est acceptée.",
+    )
+    expires_at = models.DateTimeField(db_index=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+    used_at = models.DateTimeField(null=True, blank=True)
+    message = models.TextField("Message personnalisé", blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["mutuelle", "status"]),
+            models.Index(fields=["mutuelle", "email"]),
+        ]
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Invitation {self.email} · {self.mutuelle.name}"
+
+    @property
+    def is_expired(self) -> bool:
+        from django.utils import timezone
+
+        return self.expires_at <= timezone.now()
+
+    @property
+    def is_usable(self) -> bool:
+        return self.status in {self.Status.PENDING, self.Status.SENT} and not self.is_expired
+
+    def absolute_accept_url(self, request=None) -> str:
+        """Retourne l'URL absolue à envoyer dans le mail d'invitation."""
+        from django.urls import reverse
+
+        path = reverse("accept-member-invitation", kwargs={"token": self.token})
+        if request is not None:
+            return request.build_absolute_uri(path)
+        return path

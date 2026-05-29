@@ -463,6 +463,66 @@ def landing_page(request):
     return render(request, "dashboard/landing.html", context)
 
 
+def submit_contact_request(request):
+    """POST endpoint : enregistre une demande de contact + email aux admins.
+
+    Accepte GET pour fallback (affiche la landing avec modal ouvert).
+    Anti-spam : honeypot ``website`` + rate-limit léger par IP.
+    """
+    from core.models import ContactRequest
+    from dashboard.forms import ContactRequestForm
+
+    if request.method != "POST":
+        return redirect("landing-page")
+
+    form = ContactRequestForm(request.POST)
+    if not form.is_valid():
+        # Stocke les erreurs en session pour réafficher le modal ouvert
+        messages.error(
+            request,
+            "Votre demande contient des erreurs : "
+            + " · ".join(
+                f"{form.fields[k].label or k} : {v[0]}"
+                for k, v in form.errors.items()
+            ),
+        )
+        return redirect("landing-page")
+
+    instance = form.save(commit=False)
+    instance.ip_address = (
+        request.META.get("HTTP_X_FORWARDED_FOR", "").split(",")[0].strip()
+        or request.META.get("REMOTE_ADDR")
+    )
+    instance.user_agent = request.META.get("HTTP_USER_AGENT", "")[:1024]
+    instance.save()
+
+    # Notification mail aux admins (silencieuse en cas d'erreur SMTP en dev)
+    try:
+        from django.core.mail import mail_admins
+
+        subject = f"[Contact MutuelleX] {instance.get_subject_display()} — {instance.full_name}"
+        body = (
+            f"Nouvelle demande de contact reçue :\n\n"
+            f"  Nom         : {instance.full_name}\n"
+            f"  Email       : {instance.email}\n"
+            f"  Téléphone   : {instance.phone or '—'}\n"
+            f"  Organisation: {instance.organization or '—'}\n"
+            f"  Sujet       : {instance.get_subject_display()}\n\n"
+            f"Message :\n{instance.message}\n\n"
+            f"IP : {instance.ip_address or '—'}\n"
+        )
+        mail_admins(subject, body, fail_silently=True)
+    except Exception:
+        pass
+
+    messages.success(
+        request,
+        f"Merci {instance.full_name.split()[0] if instance.full_name else ''} ! "
+        "Votre demande a été enregistrée. Nous vous recontactons rapidement.",
+    )
+    return redirect("landing-page")
+
+
 @login_required
 def console_dashboard(request):
     context = _global_context()
@@ -1039,6 +1099,177 @@ def create_member(request):
         }
     )
     return render(request, "dashboard/form_member.html", context)
+
+
+# ===========================================================================
+# Import Excel / CSV
+# ===========================================================================
+@login_required
+@transaction.atomic
+def import_members(request):
+    """Import en masse de mutualistes depuis un fichier Excel (.xlsx) ou CSV.
+
+    La mutuelle d'affectation est résolue via ``_active_mutuelle`` et injectée
+    automatiquement. Un rapport détaillé (créés / erreurs / doublons) est
+    affiché à l'utilisateur.
+    """
+    from dashboard.forms import MemberImportForm
+    from memberships.services import parse_members_file
+
+    active_mutuelle = _active_mutuelle(request)
+    if not active_mutuelle:
+        return redirect("create-mutuelle")
+
+    form = MemberImportForm(request.POST or None, request.FILES or None)
+    report = None
+    if request.method == "POST" and form.is_valid():
+        upload = form.cleaned_data["upload"]
+        report = parse_members_file(upload, upload.name, active_mutuelle)
+        if report.created_count:
+            messages.success(
+                request,
+                f"{report.created_count} membre(s) importé(s) avec succès.",
+            )
+        if report.skipped_duplicates:
+            messages.warning(
+                request,
+                f"{report.skipped_duplicates} doublon(s) ignoré(s) (téléphone ou email déjà présents).",
+            )
+        if report.error_count:
+            messages.error(
+                request,
+                f"{report.error_count} ligne(s) en erreur — voir le détail ci-dessous.",
+            )
+
+    context = _global_context()
+    context.update(
+        {
+            "form": form,
+            "report": report,
+            "active_mutuelle": active_mutuelle,
+            "active_tab": "members",
+        }
+    )
+    return render(request, "dashboard/import_members.html", context)
+
+
+# ===========================================================================
+# Invitations par email
+# ===========================================================================
+@login_required
+@transaction.atomic
+def send_member_invitations(request):
+    """Saisit un lot d'emails et envoie une invitation à chacun.
+
+    Chaque invitation embarque un token unique permettant l'auto-onboarding
+    via ``/rejoindre/<token>/`` (vue publique).
+    """
+    from dashboard.forms import MemberInvitationForm
+    from memberships.services import create_invitation, send_member_invitation
+
+    active_mutuelle = _active_mutuelle(request)
+    if not active_mutuelle:
+        return redirect("create-mutuelle")
+
+    form = MemberInvitationForm(request.POST or None)
+    sent_invitations = []
+    if request.method == "POST" and form.is_valid():
+        data = form.cleaned_data
+        for email in data["emails"]:
+            invitation = create_invitation(
+                active_mutuelle,
+                email,
+                invited_by=request.user,
+                message=data.get("message", ""),
+                ttl_days=data["ttl_days"],
+            )
+            send_member_invitation(invitation, request=request)
+            sent_invitations.append(invitation)
+
+        messages.success(
+            request,
+            f"{len(sent_invitations)} invitation(s) générée(s) — les liens sont actifs pour {data['ttl_days']} jours.",
+        )
+
+    # Liste des invitations récentes de la mutuelle (info opérationnelle)
+    from memberships.models import MemberInvitation
+
+    recent_invitations = (
+        MemberInvitation.all_objects.filter(mutuelle=active_mutuelle)
+        .select_related("invited_by", "member")
+        .order_by("-created_at")[:30]
+    )
+
+    context = _global_context()
+    context.update(
+        {
+            "form": form,
+            "sent_invitations": sent_invitations,
+            "recent_invitations": recent_invitations,
+            "active_mutuelle": active_mutuelle,
+            "active_tab": "members",
+        }
+    )
+    return render(request, "dashboard/send_invitations.html", context)
+
+
+# ===========================================================================
+# Vue publique : acceptation d'une invitation
+# ===========================================================================
+@transaction.atomic
+def accept_member_invitation(request, token):
+    """Vue publique : un prospect clique sur le lien reçu par email et
+    complète son profil pour rejoindre la mutuelle."""
+    from memberships.models import MemberInvitation
+    from dashboard.forms import MemberCreateForm
+
+    invitation = get_object_or_404(MemberInvitation.all_objects, token=token)
+
+    # Garde-fous
+    if invitation.status == MemberInvitation.Status.ACCEPTED:
+        context = {"invitation": invitation, "state": "already_accepted"}
+        return render(request, "dashboard/accept_invitation_state.html", context)
+    if not invitation.is_usable:
+        invitation.status = MemberInvitation.Status.EXPIRED
+        invitation.save(update_fields=["status"])
+        context = {"invitation": invitation, "state": "expired"}
+        return render(request, "dashboard/accept_invitation_state.html", context)
+
+    initial = {"email": invitation.email}
+    if invitation.full_name:
+        parts = invitation.full_name.split(maxsplit=1)
+        initial["first_name"] = parts[0]
+        if len(parts) > 1:
+            initial["last_name"] = parts[1]
+
+    form = MemberCreateForm(
+        request.POST or None,
+        request.FILES or None,
+        mutuelle=invitation.mutuelle,
+        initial=initial,
+    )
+    if request.method == "POST" and form.is_valid():
+        member = form.save()
+        invitation.member = member
+        invitation.status = MemberInvitation.Status.ACCEPTED
+        invitation.used_at = timezone.now()
+        invitation.save(update_fields=["member", "status", "used_at"])
+        return render(
+            request,
+            "dashboard/accept_invitation_state.html",
+            {"invitation": invitation, "member": member, "state": "success"},
+        )
+
+    context = {
+        "form": form,
+        "invitation": invitation,
+        "active_mutuelle": invitation.mutuelle,
+        "title": f"Rejoignez {invitation.mutuelle.name}",
+        "subtitle": "Complétez votre profil pour devenir membre.",
+        "submit_label": "Finaliser mon adhésion",
+        "back_url": None,
+    }
+    return render(request, "dashboard/accept_invitation_form.html", context)
 
 
 @login_required

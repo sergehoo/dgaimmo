@@ -1,0 +1,13 @@
+Bonjour,
+
+Vous êtes invité(e) à rejoindre la mutuelle {{ mutuelle.name }} sur MutuelleX.
+
+{% if invitation.message %}Message du gestionnaire :
+{{ invitation.message }}
+
+{% endif %}Cliquez sur le lien ci-dessous pour compléter votre profil et devenir membre :
+{{ accept_url }}
+
+Ce lien est valable jusqu'au {{ invitation.expires_at|date:"d/m/Y H:i" }}.
+
+— L'équipe {{ mutuelle.name }}
