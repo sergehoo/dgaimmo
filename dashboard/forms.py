@@ -130,11 +130,14 @@ class MutuelleCreateForm(StyledModelForm):
 
     class Meta:
         model = Mutuelle
+        # Note : `legal_name`, `country`, `currency` sont EXCLUS du formulaire.
+        # - legal_name : blank=True dans le modèle, modifiable ultérieurement
+        #   via l'écran branding/identité.
+        # - country / currency : prennent leurs défauts modèle (CI / XOF).
         fields = [
             "name",
             "organization_name",
             "organization_type",
-            "legal_name",
             "estimated_members_count",
             "real_estate_objective",
             "real_estate_objective_details",
@@ -143,8 +146,6 @@ class MutuelleCreateForm(StyledModelForm):
             "contact_function",
             "contact_email",
             "contact_phone",
-            "country",
-            "currency",
             "primary_color",
             "accent_color",
         ]
@@ -152,7 +153,6 @@ class MutuelleCreateForm(StyledModelForm):
             "name": "Nom de la mutuelle",
             "organization_name": "Entreprise / organisation",
             "organization_type": "Type d'organisation",
-            "legal_name": "Raison sociale",
             "estimated_members_count": "Nombre estimé de membres",
             "real_estate_objective": "Objectif immobilier",
             "real_estate_objective_details": "Précisions sur l'objectif",
@@ -161,8 +161,6 @@ class MutuelleCreateForm(StyledModelForm):
             "contact_function": "Fonction",
             "contact_email": "Email du contact",
             "contact_phone": "Téléphone du contact",
-            "country": "Pays",
-            "currency": "Devise",
             "primary_color": "Couleur principale",
             "accent_color": "Couleur secondaire",
         }
@@ -207,7 +205,6 @@ class MutuelleCreateForm(StyledModelForm):
         placeholders = {
             "name": "Ex. Mutuelle Habitat Cocody",
             "organization_name": "Ex. MutuelleX SARL",
-            "legal_name": "Dénomination officielle (facultatif)",
             "estimated_members_count": "Ex. 250",
             "contact_last_name": "OGAH",
             "contact_first_name": "Serge",
@@ -274,7 +271,6 @@ class PublicMutuelleSignupForm(forms.Form):
         choices=Mutuelle.OrganizationType.choices,
         initial=Mutuelle.OrganizationType.ENTREPRISE,
     )
-    legal_name = forms.CharField(label="Raison sociale", max_length=180, required=False)
     estimated_members_count = forms.IntegerField(
         label="Nombre estimé de membres",
         min_value=1,
@@ -293,8 +289,8 @@ class PublicMutuelleSignupForm(forms.Form):
         required=False,
         widget=forms.Textarea(attrs={"rows": 3, "placeholder": "Zone visée, type de bien, budget, calendrier..."}),
     )
-    country = forms.CharField(label="Pays", max_length=2, initial="CI")
-    currency = forms.CharField(label="Devise", max_length=3, initial="XOF")
+    # Note : country et currency utilisent les défauts du modèle (CI / XOF),
+    # paramétrables ensuite via l'écran branding/identité.
     primary_color = forms.CharField(
         label="Couleur principale",
         max_length=16,
@@ -329,8 +325,6 @@ class PublicMutuelleSignupForm(forms.Form):
                 widget.attrs.setdefault("class", BASE_SELECT)
             else:
                 widget.attrs.setdefault("class", BASE_INPUT)
-        self.fields["country"].widget.attrs.setdefault("maxlength", "2")
-        self.fields["currency"].widget.attrs.setdefault("maxlength", "3")
         # Placeholders UX
         self.fields["mutuelle_name"].widget.attrs.setdefault("placeholder", "Ex. Mutuelle Habitat Cocody")
         self.fields["organization_name"].widget.attrs.setdefault("placeholder", "Ex. SocieteX SARL")
@@ -379,12 +373,6 @@ class PublicMutuelleSignupForm(forms.Form):
             raise forms.ValidationError("Une mutuelle avec ce nom existe déjà. Ajoutez une précision au nom.")
         return name
 
-    def clean_country(self):
-        return self.cleaned_data["country"].strip().upper()
-
-    def clean_currency(self):
-        return self.cleaned_data["currency"].strip().upper()
-
     def clean(self):
         cleaned = super().clean()
         password1 = cleaned.get("password1")
@@ -400,7 +388,6 @@ class PublicMutuelleSignupForm(forms.Form):
         data = self.cleaned_data
         mutuelle = Mutuelle.objects.create(
             name=data["mutuelle_name"],
-            legal_name=data.get("legal_name", ""),
             organization_name=data["organization_name"],
             organization_type=data["organization_type"],
             estimated_members_count=data["estimated_members_count"],
@@ -413,8 +400,7 @@ class PublicMutuelleSignupForm(forms.Form):
             contact_email=data["email"],
             contact_phone=data.get("phone") or "",
             slug=slugify(data["mutuelle_name"]),
-            country=data["country"],
-            currency=data["currency"],
+            # country (CI) et currency (XOF) : défauts du modèle
             primary_color=data["primary_color"],
             accent_color="#0bbf63",
             status=Mutuelle.Status.ACTIVE,

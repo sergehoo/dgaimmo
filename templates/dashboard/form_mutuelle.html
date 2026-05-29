@@ -36,11 +36,6 @@
         {{ form.organization_type }}
         {% for error in form.organization_type.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
       </div>
-      <div class="md:col-span-2">
-        <label class="mb-2 block text-sm font-black text-[#06194a]" for="{{ form.legal_name.id_for_label }}">{{ form.legal_name.label }}</label>
-        {{ form.legal_name }}
-        {% for error in form.legal_name.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
-      </div>
     </div>
 
     {# ---------- Bloc 2 : Dimensionnement & objectif ---------- #}
@@ -104,19 +99,9 @@
       </div>
     </div>
 
-    {# ---------- Bloc 4 : Localisation & branding ---------- #}
-    <h2 class="mb-3 mt-8 text-lg font-black text-[#06194a]">Localisation &amp; branding</h2>
+    {# ---------- Bloc 4 : Branding ---------- #}
+    <h2 class="mb-3 mt-8 text-lg font-black text-[#06194a]">Branding</h2>
     <div class="grid gap-5 md:grid-cols-2">
-      <div>
-        <label class="mb-2 block text-sm font-black text-[#06194a]" for="{{ form.country.id_for_label }}">{{ form.country.label }}</label>
-        {{ form.country }}
-        {% for error in form.country.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
-      </div>
-      <div>
-        <label class="mb-2 block text-sm font-black text-[#06194a]" for="{{ form.currency.id_for_label }}">{{ form.currency.label }}</label>
-        {{ form.currency }}
-        {% for error in form.currency.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
-      </div>
       <div class="md:col-span-2">
         <label class="mb-2 block text-sm font-black text-[#06194a]" for="{{ form.primary_color.id_for_label }}">{{ form.primary_color.label }}</label>
         <div class="rounded-2xl border border-[#e5edf8] bg-[#f7faff] p-4">
