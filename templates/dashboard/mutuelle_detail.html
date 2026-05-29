@@ -7,9 +7,6 @@
   <span>{{ mutuelle.name }}</span>
 </p>
 
-{# =========================================================
-   HEADER : identité de la mutuelle + actions
-   ========================================================= #}
 <section class="rounded-2xl border border-[#dfe9f8] bg-white p-7 shadow-sm">
   <div class="flex flex-wrap items-start justify-between gap-6">
     <div class="flex min-w-0 items-center gap-5">
@@ -48,14 +45,11 @@
   </div>
 </section>
 
-{# =========================================================
-   4 KPI PRINCIPAUX
-   ========================================================= #}
 <section class="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
   {# KPI 1 — Nombre de membres #}
   <article class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm">
     <div class="flex items-start justify-between">
-      <span class="grid h-12 w-12 place-items-center rounded-xl bg-[#eaf2ff] text-2xl">👥</span>
+      <span class="grid h-12 w-12 place-items-center rounded-xl bg-[#eaf2ff] text-2xl text-[#0b55d9]"><i class="fa-solid fa-users"></i></span>
       <span class="rounded-full bg-[#e8fff2] px-3 py-1 text-xs font-black text-[#0b9f5b]">{{ members_active|intcomma }} actifs</span>
     </div>
     <p class="mt-5 text-xs font-black uppercase tracking-wider text-[#667899]">Nombre de membres</p>
@@ -66,7 +60,7 @@
   {# KPI 2 — Capacité d'emprunt totale #}
   <article class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm">
     <div class="flex items-start justify-between">
-      <span class="grid h-12 w-12 place-items-center rounded-xl bg-[#fff4e5] text-2xl">💰</span>
+      <span class="grid h-12 w-12 place-items-center rounded-xl bg-[#fff4e5] text-2xl text-[#b56a00]"><i class="fa-solid fa-sack-dollar"></i></span>
       <span class="rounded-full bg-[#fff7df] px-3 py-1 text-xs font-black text-[#b56a00]">{{ mutuelle.currency }}</span>
     </div>
     <p class="mt-5 text-xs font-black uppercase tracking-wider text-[#667899]">Capacité d'emprunt totale</p>
@@ -77,7 +71,7 @@
   {# KPI 3 — Score de solvabilité global #}
   <article class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm">
     <div class="flex items-start justify-between">
-      <span class="grid h-12 w-12 place-items-center rounded-xl bg-[#ede9fe] text-2xl">📊</span>
+      <span class="grid h-12 w-12 place-items-center rounded-xl bg-[#ede9fe] text-2xl text-[#7c3aed]"><i class="fa-solid fa-gauge-high"></i></span>
       <span class="rounded-full bg-[#ede9fe] px-3 py-1 text-xs font-black text-[#7c3aed]">/100</span>
     </div>
     <p class="mt-5 text-xs font-black uppercase tracking-wider text-[#667899]">Score de solvabilité global</p>
@@ -91,7 +85,7 @@
   {# KPI 4 — Budget estimé du projet possible #}
   <article class="rounded-2xl bg-gradient-to-br from-[#06194a] to-[#003b98] p-6 text-white shadow-2xl shadow-blue-950/20">
     <div class="flex items-start justify-between">
-      <span class="grid h-12 w-12 place-items-center rounded-xl bg-white/15 text-2xl">🏗️</span>
+      <span class="grid h-12 w-12 place-items-center rounded-xl bg-white/15 text-2xl text-[#caff3d]"><i class="fa-solid fa-city"></i></span>
       <span class="rounded-full bg-white/15 px-3 py-1 text-xs font-black text-[#cfff3d]">{{ mutuelle.real_estate_objectives_display|default:"Projet" }}</span>
     </div>
     <p class="mt-5 text-xs font-black uppercase tracking-wider text-white/70">Budget estimé du projet possible</p>
@@ -100,35 +94,72 @@
   </article>
 </section>
 
-{# =========================================================
-   NAVIGATION ONGLETS (5 SECTIONS)
-   ========================================================= #}
+<section class="mt-7 rounded-2xl border border-[#e5edf8] bg-white p-7 shadow-sm">
+  <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
+    <div>
+      <p class="text-xs font-black uppercase tracking-wider text-[#0b55d9]"><i class="fa-solid fa-bullseye"></i> Projets souhaités par les membres</p>
+      <h2 class="mt-2 text-2xl font-black text-[#06194a]">Nombre de membres par type de projet</h2>
+      <p class="mt-1 text-sm font-semibold text-[#536484]">
+        {{ members_with_objective_count|intcomma }} membre(s) sur {{ kpi_members_count|intcomma }} ont déclaré au moins un objectif
+        {% if members_objectives_total_picks %} · {{ members_objectives_total_picks|intcomma }} sélection(s) cumulée(s){% endif %}.
+      </p>
+    </div>
+    <a href="{% url 'create-project' %}" class="rounded-xl bg-[#0b55d9] px-4 py-3 text-sm font-black text-white no-underline shadow-lg shadow-blue-900/20"><i class="fa-solid fa-plus"></i> Créer un programme</a>
+  </div>
+
+  {% if members_objectives_aggregated %}
+  <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    {% for obj in members_objectives_aggregated %}
+      <article class="rounded-2xl border border-[#e5edf8] bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-xl hover:shadow-blue-950/10">
+        <div class="flex items-start justify-between">
+          <span class="grid h-12 w-12 place-items-center rounded-xl text-xl" style="background: {{ obj.bg }}; color: {{ obj.color }}"><i class="{{ obj.icon }}"></i></span>
+          <span class="rounded-full bg-[#f7faff] px-3 py-1 text-xs font-black text-[#536484]">{{ obj.pct }}%</span>
+        </div>
+        <p class="mt-4 text-xs font-black uppercase text-[#667899]">{{ obj.label }}</p>
+        <b class="mt-1 block text-3xl font-black text-[#06194a]">{{ obj.count|intcomma }}</b>
+        <small class="block text-xs font-bold text-[#536484]">membre(s) intéressé(s)</small>
+        <div class="mt-3 h-2 w-full rounded-full bg-[#eef3fb]">
+          <div class="h-2 rounded-full" style="width:{{ obj.pct }}%; background:{{ obj.color }}"></div>
+        </div>
+      </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="rounded-2xl bg-[#f7faff] p-8 text-center">
+    <i class="fa-solid fa-bullseye text-3xl text-[#0b55d9]"></i>
+    <p class="mt-3 text-sm font-bold text-[#06194a]">Aucun membre n'a encore déclaré d'objectif immobilier.</p>
+    <p class="mt-1 text-xs font-semibold text-[#536484]">Les objectifs sont saisis lors de l'enrôlement d'un membre.</p>
+    <a href="{% url 'create-member' %}" class="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#0b55d9] px-4 py-2 text-xs font-black text-white no-underline"><i class="fa-solid fa-user-plus"></i> Enrôler un membre</a>
+  </div>
+  {% endif %}
+</section>
+
 <section class="mt-7" x-data="{ tab: 'members' }">
   <div class="flex flex-wrap gap-2 rounded-2xl border border-[#e5edf8] bg-white p-2 shadow-sm">
     <button type="button" @click="tab='members'"
             :class="tab === 'members' ? 'bg-[#0b55d9] text-white shadow-md' : 'bg-transparent text-[#06194a] hover:bg-[#f3f7ff]'"
             class="flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-black transition">
-      <span>👥</span> Membres <span class="rounded-full bg-white/20 px-2 py-0.5 text-xs">{{ members_total|intcomma }}</span>
+      <i class="fa-solid fa-users"></i> Membres <span class="rounded-full bg-white/20 px-2 py-0.5 text-xs">{{ members_total|intcomma }}</span>
     </button>
     <button type="button" @click="tab='analytics'"
             :class="tab === 'analytics' ? 'bg-[#0b55d9] text-white shadow-md' : 'bg-transparent text-[#06194a] hover:bg-[#f3f7ff]'"
             class="flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-black transition">
-      <span>📈</span> Analyse financière
+      <i class="fa-solid fa-chart-line"></i> Analyse financière
     </button>
     <button type="button" @click="tab='projects'"
             :class="tab === 'projects' ? 'bg-[#0b55d9] text-white shadow-md' : 'bg-transparent text-[#06194a] hover:bg-[#f3f7ff]'"
             class="flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-black transition">
-      <span>🏗️</span> Projets proposés <span class="rounded-full bg-white/20 px-2 py-0.5 text-xs">{{ programs_count|intcomma }}</span>
+      <i class="fa-solid fa-building-circle-arrow-right"></i> Projets proposés <span class="rounded-full bg-white/20 px-2 py-0.5 text-xs">{{ programs_count|intcomma }}</span>
     </button>
     <button type="button" @click="tab='payments'"
             :class="tab === 'payments' ? 'bg-[#0b55d9] text-white shadow-md' : 'bg-transparent text-[#06194a] hover:bg-[#f3f7ff]'"
             class="flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-black transition">
-      <span>💳</span> Suivi des paiements
+      <i class="fa-solid fa-credit-card"></i> Suivi des paiements
     </button>
     <button type="button" @click="tab='documents'"
             :class="tab === 'documents' ? 'bg-[#0b55d9] text-white shadow-md' : 'bg-transparent text-[#06194a] hover:bg-[#f3f7ff]'"
             class="flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-black transition">
-      <span>📁</span> Documents <span class="rounded-full bg-white/20 px-2 py-0.5 text-xs">{{ documents_total|intcomma }}</span>
+      <i class="fa-solid fa-folder-open"></i> Documents <span class="rounded-full bg-white/20 px-2 py-0.5 text-xs">{{ documents_total|intcomma }}</span>
     </button>
   </div>
 
@@ -158,12 +189,12 @@
         </thead>
         <tbody class="divide-y divide-[#edf2fb]">
           {% for member in members %}
-          <tr class="font-bold">
+          <tr class="cursor-pointer font-bold transition hover:bg-[#f7faff]" onclick="window.location='{% url 'member-detail' member.id %}'">
             <td class="px-4 py-4">
               <div class="flex items-center gap-3">
                 <span class="grid h-9 w-9 flex-none place-items-center rounded-xl bg-[#eef4ff] text-xs font-black text-[#0b55d9]">{{ member.first_name|slice:":1" }}{{ member.last_name|slice:":1" }}</span>
                 <div>
-                  <b>{{ member.last_name|upper }} {{ member.first_name }}</b>
+                  <a href="{% url 'member-detail' member.id %}" class="text-[#06194a] no-underline hover:text-[#0b55d9]">{{ member.last_name|upper }} {{ member.first_name }}</a>
                   <small class="block text-xs font-bold text-[#536484]">{{ member.phone }}{% if member.email %} · {{ member.email }}{% endif %}</small>
                 </div>
               </div>
@@ -176,7 +207,7 @@
                 {{ member.get_status_display }}
               </span>
             </td>
-            <td class="px-4 py-4">{% if member.kyc_validated %}<span class="text-[#0b9f5b]">✓ Validé</span>{% else %}<span class="text-[#b56a00]">En attente</span>{% endif %}</td>
+            <td class="px-4 py-4">{% if member.kyc_validated %}<span class="text-[#0b9f5b]"><i class="fa-solid fa-circle-check"></i> Validé</span>{% else %}<span class="text-[#b56a00]"><i class="fa-regular fa-clock"></i> En attente</span>{% endif %}</td>
           </tr>
           {% empty %}
           <tr><td colspan="6" class="px-4 py-8 text-center text-sm font-bold text-[#667899]">Aucun membre. <a href="{% url 'create-member' %}" class="text-[#0b55d9]">Ajouter le premier membre →</a></td></tr>
@@ -224,6 +255,26 @@
           <div class="rounded-xl bg-[#fff4e5] p-4"><small class="text-xs font-black uppercase text-[#b56a00]">Échéances dues</small><b class="mt-1 block text-2xl">{{ contributions_due_count|intcomma }}</b><span class="text-xs font-bold text-[#b56a00]">dont {{ contributions_overdue_count }} en retard</span></div>
         </div>
       </div>
+      <div class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm">
+        <h3 class="text-base font-black"><i class="fa-solid fa-bullseye text-[#0aa25f]"></i> Objectifs immobiliers cumulés</h3>
+        <p class="mt-1 text-xs font-semibold text-[#536484]">Agrégation des choix déclarés par les membres ({{ kpi_members_count|intcomma }} mutualistes).</p>
+        <div class="mt-5 grid gap-3">
+          {% for obj in members_objectives_aggregated %}
+            <div class="rounded-xl bg-[#f7faff] p-3">
+              <div class="flex items-center justify-between gap-3">
+                <b class="text-sm">{{ obj.label }}</b>
+                <small class="font-bold text-[#536484]">{{ obj.count|intcomma }} membres · {{ obj.pct }}%</small>
+              </div>
+              <div class="mt-2 h-2 w-full rounded-full bg-[#eef3fb]">
+                <div class="h-2 rounded-full bg-gradient-to-r from-[#0b55d9] to-[#0aa25f]" style="width:{{ obj.pct }}%"></div>
+              </div>
+            </div>
+          {% empty %}
+            <p class="rounded-xl bg-[#f7faff] p-4 text-sm font-bold text-[#667899]">Aucun objectif déclaré par les membres pour le moment.</p>
+          {% endfor %}
+        </div>
+      </div>
+
       <div class="rounded-2xl bg-[#06194a] p-6 text-white shadow-xl shadow-blue-950/15">
         <h3 class="text-base font-black text-[#cfff3d]">Synthèse simulations</h3>
         <div class="mt-5 grid gap-2 text-sm">
@@ -334,7 +385,7 @@
           <small class="block text-xs font-bold text-[#536484]">{{ doc.created_at|date:"d/m/Y H:i" }}{% if doc.document_type %} · {{ doc.document_type }}{% endif %}</small>
         </div>
         {% if doc.verified %}
-          <span class="rounded-full bg-[#e8fff2] px-3 py-1 text-xs font-black text-[#0b9f5b]">✓ Validé</span>
+          <span class="rounded-full bg-[#e8fff2] px-3 py-1 text-xs font-black text-[#0b9f5b]"><i class="fa-solid fa-circle-check"></i> Validé</span>
         {% else %}
           <span class="rounded-full bg-[#fff7df] px-3 py-1 text-xs font-black text-[#b56a00]">À revoir</span>
         {% endif %}
@@ -346,9 +397,7 @@
   </article>
 </section>
 
-{# =========================================================
-   FOOTER : Actions rapides
-   ========================================================= #}
+
 <section class="mt-7 rounded-2xl border border-[#e5edf8] bg-white p-7 shadow-sm">
   <h2 class="text-xl font-black">Actions rapides</h2>
   <div class="mt-5 grid gap-3 md:grid-cols-3 xl:grid-cols-6">
@@ -357,7 +406,7 @@
     <a href="{% url 'create-simulation' %}" class="rounded-xl bg-[#eaf2ff] px-4 py-3 text-sm font-black text-[#0b55d9] no-underline">+ Simulation</a>
     <a href="{% url 'create-project' %}" class="rounded-xl bg-[#eaf2ff] px-4 py-3 text-sm font-black text-[#0b55d9] no-underline">+ Projet</a>
     <a href="{% url 'create-contribution' %}" class="rounded-xl bg-[#eaf2ff] px-4 py-3 text-sm font-black text-[#0b55d9] no-underline">+ Cotisation</a>
-    <a href="{% url 'mutuelle-report' mutuelle.id %}" class="rounded-xl bg-[#06194a] px-4 py-3 text-sm font-black text-white no-underline">📊 Rapport complet</a>
+    <a href="{% url 'mutuelle-report' mutuelle.id %}" class="rounded-xl bg-[#06194a] px-4 py-3 text-sm font-black text-white no-underline"><i class="fa-solid fa-file-lines"></i> Rapport complet</a>
   </div>
 </section>
 {% endblock %}

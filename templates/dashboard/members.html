@@ -12,7 +12,7 @@
         <thead class="bg-[#f7faff] text-xs uppercase text-[#536484]"><tr><th class="px-4 py-4">Membre</th><th>Mutuelle</th><th>Téléphone</th><th>KYC</th><th>Statut</th></tr></thead>
         <tbody class="divide-y divide-[#edf2fb]">
           {% for member in members %}
-          <tr class="font-bold"><td class="px-4 py-4">{{ member.first_name }} {{ member.last_name }}</td><td>{{ member.mutuelle.name }}</td><td>{{ member.phone }}</td><td>{% if member.kyc_validated %}<span class="text-[#0aa25f]">Validé</span>{% else %}En attente{% endif %}</td><td>{{ member.status }}</td></tr>
+          <tr class="cursor-pointer font-bold transition hover:bg-[#f7faff]" onclick="window.location='{% url 'member-detail' member.id %}'"><td class="px-4 py-4"><a href="{% url 'member-detail' member.id %}" class="text-[#06194a] no-underline hover:text-[#0b55d9]">{{ member.last_name|upper }} {{ member.first_name }}</a></td><td>{{ member.mutuelle.name }}</td><td>{{ member.phone }}</td><td>{% if member.kyc_validated %}<span class="text-[#0aa25f]"><i class="fa-solid fa-circle-check"></i> Validé</span>{% else %}<span class="text-[#b56a00]"><i class="fa-regular fa-clock"></i> En attente</span>{% endif %}</td><td>{{ member.get_status_display }}</td></tr>
           {% endfor %}
         </tbody>
       </table>

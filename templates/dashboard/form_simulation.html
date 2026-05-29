@@ -1,0 +1,79 @@
+{% extends "dashboard/console_base.html" %}
+{% block console_content %}
+<div class="mb-7 flex flex-wrap items-center justify-between gap-4">
+  <div>
+    <p class="text-sm font-bold text-[#536484]">MutuelleX · Workflow simulation</p>
+    <h1 class="text-3xl font-black">{{ title }}</h1>
+    <p class="mt-2 max-w-3xl text-sm font-semibold text-[#536484]">{{ subtitle }}</p>
+  </div>
+  <a href="{% url 'member-detail' member_id=target_member.id %}" class="rounded-xl border border-[#dce7f6] bg-white px-5 py-3 text-sm font-black text-[#06337d] no-underline">Retour à la fiche</a>
+</div>
+
+<section class="grid gap-6 xl:grid-cols-[1fr_.42fr]">
+  <form method="post" class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm">
+    {% csrf_token %}
+    <input type="hidden" name="member_id" value="{{ target_member.id }}">
+    {% if form.non_field_errors %}
+      <div class="mb-5 rounded-xl bg-red-50 p-4 text-sm font-bold text-red-700">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    {# --------- Bandeau membre cible (lecture seule) --------- #}
+    <h2 class="mb-3 text-lg font-black text-[#06194a]"><i class="fa-solid fa-id-card text-[#0b55d9]"></i> Membre concerné</h2>
+    <div class="mb-6 flex items-center gap-4 rounded-2xl border border-[#dbe6f5] bg-[#f7faff] p-4">
+      <span class="grid h-12 w-12 flex-none place-items-center rounded-xl bg-[#0b55d9] text-sm font-black text-white">
+        {{ target_member.first_name|slice:":1" }}{{ target_member.last_name|slice:":1" }}
+      </span>
+      <div class="min-w-0">
+        <b class="block text-base">{{ target_member.last_name|upper }} {{ target_member.first_name }}</b>
+        <small class="block text-xs font-bold text-[#536484]">
+          {{ target_member.member_code }}
+          {% if target_member.employer %} · {{ target_member.employer }}{% endif %}
+          {% if target_member.job_function %} · {{ target_member.job_function }}{% endif %}
+        </small>
+      </div>
+      <span class="ml-auto rounded-full bg-white px-3 py-1 text-xs font-black text-[#0b55d9]">{{ active_mutuelle.name }}</span>
+    </div>
+
+    {# --------- Paramètres de simulation --------- #}
+    <h2 class="mb-3 mt-2 text-lg font-black text-[#06194a]"><i class="fa-solid fa-sliders text-[#7c3aed]"></i> Paramètres</h2>
+    <div class="grid gap-5 md:grid-cols-2">
+      <div>
+        <label class="mb-2 block text-sm font-black text-[#06194a]" for="{{ form.requested_amount.id_for_label }}">{{ form.requested_amount.label }} <span class="text-red-500">*</span></label>
+        {{ form.requested_amount }}
+        {% for error in form.requested_amount.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+      <div>
+        <label class="mb-2 block text-sm font-black text-[#06194a]" for="{{ form.requested_duration_months.id_for_label }}">{{ form.requested_duration_months.label }} <span class="text-red-500">*</span></label>
+        {{ form.requested_duration_months }}
+        {% for error in form.requested_duration_months.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+      <div>
+        <label class="mb-2 block text-sm font-black text-[#06194a]" for="{{ form.annual_interest_rate.id_for_label }}">{{ form.annual_interest_rate.label }}</label>
+        {{ form.annual_interest_rate }}
+        {% for error in form.annual_interest_rate.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+      <div>
+        <label class="mb-2 block text-sm font-black text-[#06194a]" for="{{ form.max_debt_ratio.id_for_label }}">{{ form.max_debt_ratio.label }}</label>
+        {{ form.max_debt_ratio }}
+        {% for error in form.max_debt_ratio.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+    </div>
+
+    <div class="mt-8 flex flex-wrap gap-3">
+      <button type="submit" class="rounded-xl bg-[#0b55d9] px-6 py-4 text-sm font-black text-white shadow-lg shadow-blue-900/20"><i class="fa-solid fa-gauge-high"></i> {{ submit_label }}</button>
+      <a href="{% url 'member-detail' member_id=target_member.id %}" class="rounded-xl border border-[#dce7f6] bg-white px-6 py-4 text-sm font-black text-[#06194a] no-underline">Annuler</a>
+    </div>
+  </form>
+
+  <aside class="rounded-2xl bg-[#06194a] p-7 text-white shadow-2xl shadow-blue-950/15">
+    <span class="text-xs font-black uppercase text-[#72e7a6]"><i class="fa-solid fa-circle-info"></i> Comment ça marche</span>
+    <h2 class="mt-4 text-2xl font-black">Quotité cessible</h2>
+    <div class="mt-6 grid gap-4 text-sm text-white/80">
+      <p class="rounded-2xl bg-white/10 p-4"><b class="block text-white"><i class="fa-solid fa-1 text-[#cfff3d]"></i> Revenu total</b><span class="mt-1 block">Calculé depuis le profil financier (salaire + revenus complémentaires + pensions reçues).</span></p>
+      <p class="rounded-2xl bg-white/10 p-4"><b class="block text-white"><i class="fa-solid fa-2 text-[#cfff3d]"></i> Capacité brute</b><span class="mt-1 block">Revenu total × taux d'endettement max (33 % par défaut, conforme UEMOA).</span></p>
+      <p class="rounded-2xl bg-white/10 p-4"><b class="block text-white"><i class="fa-solid fa-3 text-[#cfff3d]"></i> Capacité nette</b><span class="mt-1 block">Capacité brute − mensualités de prêts en cours − autres dettes mensualisées.</span></p>
+      <p class="rounded-2xl bg-white/10 p-4"><b class="block text-white"><i class="fa-solid fa-4 text-[#cfff3d]"></i> Décision</b><span class="mt-1 block">Éligible / Éligible sous réserve / Non éligible, selon mensualité demandée vs autorisée.</span></p>
+    </div>
+  </aside>
+</section>
+{% endblock %}

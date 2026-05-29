@@ -112,6 +112,16 @@ class Member(TenantModel):
     )
     bank_account_number = models.CharField("Numéro de compte / IBAN", max_length=64, blank=True)
 
+    # ---- Objectifs immobiliers personnels ----
+    # Le membre déclare ses propres ambitions (terrain, maison, immeuble…).
+    # La mutuelle agrège ces valeurs pour piloter ses choix de programme.
+    real_estate_objective = models.JSONField(
+        "Objectifs immobiliers du membre",
+        default=list,
+        blank=True,
+        help_text="Liste des objectifs immobiliers visés par ce membre (sélection multiple).",
+    )
+
     # ---- Statut & onboarding ----
     status = models.CharField(
         max_length=24, choices=Status.choices, default=Status.PROSPECT, db_index=True
@@ -152,6 +162,26 @@ class Member(TenantModel):
     @property
     def seniority_years(self):
         return round((self.professional_seniority_months or 0) / 12, 1)
+
+    @property
+    def real_estate_objectives_labels(self) -> list:
+        """Libellés humains des objectifs immobiliers du membre."""
+        # Choices alignées sur Mutuelle.RealEstateObjective
+        choices = {
+            "terrain": "Terrain",
+            "maison": "Maison / villa",
+            "immeuble": "Immeuble",
+            "appartement": "Appartement",
+            "logement_social": "Logement social",
+            "programme_promoteur": "Programme promoteur",
+            "construction_collective": "Construction collective",
+            "autre": "Autre objectif",
+        }
+        return [choices.get(v, v) for v in (self.real_estate_objective or [])]
+
+    @property
+    def real_estate_objectives_display(self) -> str:
+        return " · ".join(self.real_estate_objectives_labels)
 
 
 class Beneficiary(TenantModel):

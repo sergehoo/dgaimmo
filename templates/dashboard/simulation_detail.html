@@ -1,0 +1,172 @@
+{% extends "dashboard/console_base.html" %}
+{% load humanize %}
+{% block console_content %}
+<p class="mb-5 text-sm font-bold text-[#536484]">
+  <a href="{% url 'dashboard-home' %}" class="text-[#0b55d9] no-underline">Accueil</a> ›
+  <a href="{% url 'simulations-center' %}" class="text-[#0b55d9] no-underline">Simulations</a> ›
+  <span>Simulation du {{ simulation.created_at|date:"d/m/Y H:i" }}</span>
+</p>
+
+{# ============== HEADER ============== #}
+<section class="rounded-2xl border border-[#dfe9f8] bg-white p-7 shadow-sm">
+  <div class="flex flex-wrap items-start justify-between gap-6">
+    <div class="flex min-w-0 items-center gap-5">
+      <div class="grid h-20 w-20 shrink-0 place-items-center rounded-2xl text-2xl text-white shadow-lg" style="background: {{ mutuelle.primary_color|default:'#0b55d9' }}">
+        <i class="fa-solid fa-gauge-high"></i>
+      </div>
+      <div class="min-w-0">
+        <div class="flex flex-wrap items-center gap-3">
+          <h1 class="truncate text-2xl font-black sm:text-3xl">Simulation quotité cessible</h1>
+          <span class="rounded-full px-3 py-1 text-xs font-black
+            {% if simulation.decision == 'eligible' %}bg-[#e8fff2] text-[#0b9f5b]
+            {% elif simulation.decision == 'conditional' %}bg-[#fff4e5] text-[#b56a00]
+            {% else %}bg-red-50 text-red-700{% endif %}">
+            {% if simulation.decision == 'eligible' %}<i class="fa-solid fa-circle-check"></i>
+            {% elif simulation.decision == 'conditional' %}<i class="fa-solid fa-triangle-exclamation"></i>
+            {% else %}<i class="fa-solid fa-circle-xmark"></i>{% endif %}
+            {{ simulation.get_decision_display }}
+          </span>
+        </div>
+        <p class="mt-2 text-sm font-bold text-[#536484]">
+          <i class="fa-solid fa-user"></i>
+          <a class="text-[#0b55d9] no-underline" href="{% url 'member-detail' member.id %}">{{ member.last_name|upper }} {{ member.first_name }}</a>
+          · <i class="fa-solid fa-id-card"></i> {{ member.member_code }}
+          · <i class="fa-solid fa-clock"></i> {{ simulation.created_at|date:"d/m/Y H:i" }}
+        </p>
+      </div>
+    </div>
+    <div class="flex flex-wrap gap-3">
+      <a href="{% url 'member-detail' member.id %}" class="rounded-xl border border-[#dce7f6] bg-white px-4 py-3 text-sm font-black text-[#0b55d9] no-underline"><i class="fa-solid fa-user"></i> Fiche membre</a>
+      <a href="{% url 'create-simulation' %}?member_id={{ member.id }}" class="rounded-xl bg-[#0b55d9] px-4 py-3 text-sm font-black text-white no-underline shadow-lg shadow-blue-900/20"><i class="fa-solid fa-repeat"></i> Relancer une simulation</a>
+    </div>
+  </div>
+</section>
+
+{# ============== KPI ============== #}
+<section class="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+  <article class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm">
+    <span class="grid h-12 w-12 place-items-center rounded-xl bg-[#eaf2ff] text-xl text-[#0b55d9]"><i class="fa-solid fa-sack-dollar"></i></span>
+    <p class="mt-4 text-xs font-black uppercase text-[#667899]">Mensualité max autorisée</p>
+    <b class="mt-1 block text-2xl font-black text-[#06194a]">{{ simulation.max_authorized_payment|floatformat:0|intcomma }}</b>
+    <small class="mt-2 block text-xs font-bold text-[#536484]">{{ mutuelle.currency }} · capacité de remboursement</small>
+  </article>
+  <article class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm">
+    <span class="grid h-12 w-12 place-items-center rounded-xl bg-[#e8fff2] text-xl text-[#0aa25f]"><i class="fa-solid fa-coins"></i></span>
+    <p class="mt-4 text-xs font-black uppercase text-[#667899]">Montant finançable</p>
+    <b class="mt-1 block text-2xl font-black text-[#06194a]">{{ simulation.financeable_amount|floatformat:0|intcomma }}</b>
+    <small class="mt-2 block text-xs font-bold text-[#536484]">{{ mutuelle.currency }} · enveloppe estimée</small>
+  </article>
+  <article class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm">
+    <span class="grid h-12 w-12 place-items-center rounded-xl bg-[#ede9fe] text-xl text-[#7c3aed]"><i class="fa-solid fa-scale-balanced"></i></span>
+    <p class="mt-4 text-xs font-black uppercase text-[#667899]">Taux d'endettement</p>
+    <b class="mt-1 block text-2xl font-black text-[#06194a]">{{ simulation.debt_ratio|floatformat:1 }}%</b>
+    <small class="mt-2 block text-xs font-bold text-[#536484]">Plafond {{ simulation.max_debt_ratio|floatformat:0 }}%</small>
+  </article>
+  <article class="rounded-2xl bg-gradient-to-br from-[#06194a] to-[#003b98] p-6 text-white shadow-2xl shadow-blue-950/20">
+    <span class="grid h-12 w-12 place-items-center rounded-xl bg-white/15 text-xl text-[#caff3d]"><i class="fa-solid fa-house-chimney"></i></span>
+    <p class="mt-4 text-xs font-black uppercase text-white/70">Reste à vivre</p>
+    <b class="mt-1 block text-2xl font-black text-white">{{ simulation.living_remainder|floatformat:0|intcomma }}</b>
+    <small class="mt-2 block text-xs font-bold text-white/70">{{ mutuelle.currency }} après remboursement</small>
+  </article>
+</section>
+
+{# ============== Détails simulation ============== #}
+<section class="mt-7 grid gap-6 xl:grid-cols-[1.1fr_.9fr]">
+
+  <article class="rounded-2xl border border-[#e5edf8] bg-white p-7 shadow-sm">
+    <h2 class="text-xl font-black"><i class="fa-solid fa-sliders text-[#0b55d9]"></i> Paramètres &amp; résultats</h2>
+    <div class="mt-5 grid gap-4 md:grid-cols-2">
+      <div>
+        <h3 class="mb-3 text-xs font-black uppercase text-[#667899]">Demande</h3>
+        <dl class="grid gap-2 text-sm">
+          <div class="flex justify-between border-b border-[#edf2fb] pb-2"><dt class="font-bold text-[#536484]">Montant demandé</dt><dd class="font-black">{{ simulation.requested_amount|floatformat:0|intcomma }} {{ mutuelle.currency }}</dd></div>
+          <div class="flex justify-between border-b border-[#edf2fb] pb-2"><dt class="font-bold text-[#536484]">Période d'amortissement</dt><dd class="font-black">{{ simulation.requested_duration_months|intcomma }} mois</dd></div>
+          <div class="flex justify-between border-b border-[#edf2fb] pb-2"><dt class="font-bold text-[#536484]">Taux annuel</dt><dd class="font-black">{{ simulation.annual_interest_rate|floatformat:2 }}%</dd></div>
+          <div class="flex justify-between"><dt class="font-bold text-[#536484]">Taux endettement max</dt><dd class="font-black">{{ simulation.max_debt_ratio|floatformat:0 }}%</dd></div>
+        </dl>
+      </div>
+      <div>
+        <h3 class="mb-3 text-xs font-black uppercase text-[#667899]">Résultat</h3>
+        <dl class="grid gap-2 text-sm">
+          <div class="flex justify-between border-b border-[#edf2fb] pb-2"><dt class="font-bold text-[#536484]">Mensualité estimée</dt><dd class="font-black">{{ simulation.estimated_payment|floatformat:0|intcomma }}</dd></div>
+          <div class="flex justify-between border-b border-[#edf2fb] pb-2"><dt class="font-bold text-[#536484]">Mensualité max autorisée</dt><dd class="font-black text-[#0b9f5b]">{{ simulation.max_authorized_payment|floatformat:0|intcomma }}</dd></div>
+          <div class="flex justify-between border-b border-[#edf2fb] pb-2"><dt class="font-bold text-[#536484]">Capacité brute</dt><dd class="font-black">{{ simulation.gross_capacity|floatformat:0|intcomma }}</dd></div>
+          <div class="flex justify-between"><dt class="font-bold text-[#536484]">Capacité nette</dt><dd class="font-black text-[#7c3aed]">{{ simulation.net_capacity|floatformat:0|intcomma }}</dd></div>
+        </dl>
+      </div>
+    </div>
+
+    <h3 class="mt-7 mb-3 text-xs font-black uppercase text-[#667899]">Base de calcul (issue du profil financier)</h3>
+    <div class="grid gap-3 sm:grid-cols-3">
+      <div class="rounded-xl bg-[#e8fff2] p-4"><span class="text-xs font-black uppercase text-[#0b9f5b]"><i class="fa-solid fa-money-bill-trend-up"></i> Revenus totaux</span><b class="mt-1 block text-xl">{{ simulation.total_income|floatformat:0|intcomma }}</b></div>
+      <div class="rounded-xl bg-[#fff4e5] p-4"><span class="text-xs font-black uppercase text-[#b56a00]"><i class="fa-solid fa-receipt"></i> Charges mensuelles</span><b class="mt-1 block text-xl">{{ simulation.monthly_charges|floatformat:0|intcomma }}</b></div>
+      <div class="rounded-xl bg-red-50 p-4"><span class="text-xs font-black uppercase text-red-700"><i class="fa-solid fa-credit-card"></i> Prêts en cours</span><b class="mt-1 block text-xl">{{ simulation.existing_debt_payments|floatformat:0|intcomma }}</b></div>
+    </div>
+
+    {# Recommandations IA si présentes #}
+    {% if simulation.recommendations %}
+    <h3 class="mt-7 mb-3 text-xs font-black uppercase text-[#667899]"><i class="fa-solid fa-lightbulb text-[#caff3d]"></i> Recommandations</h3>
+    <ul class="grid gap-2 text-sm">
+      {% for rec in simulation.recommendations %}
+        <li class="flex items-start gap-3 rounded-xl bg-[#f7faff] p-3"><i class="fa-solid fa-arrow-right mt-1 text-[#0b55d9]"></i><span class="font-bold text-[#06194a]">{{ rec }}</span></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </article>
+
+  <aside class="grid gap-4">
+    {# Bandeau décision visuel #}
+    <div class="rounded-2xl p-6 shadow-xl
+      {% if simulation.decision == 'eligible' %}bg-gradient-to-br from-[#0aa25f] to-[#0b9f5b] text-white shadow-emerald-900/20
+      {% elif simulation.decision == 'conditional' %}bg-gradient-to-br from-[#f59e0b] to-[#b97900] text-white shadow-amber-900/20
+      {% else %}bg-gradient-to-br from-[#c93838] to-[#991b1b] text-white shadow-red-900/20{% endif %}">
+      <span class="text-xs font-black uppercase tracking-wider text-white/80">Décision du système</span>
+      <h2 class="mt-3 text-3xl font-black leading-tight">{{ simulation.get_decision_display }}</h2>
+      <p class="mt-3 text-sm font-bold text-white/85">
+        {% if simulation.decision == 'eligible' %}Capacité confirmée. Le membre peut prétendre au montant demandé.
+        {% elif simulation.decision == 'conditional' %}Capacité limite. Ajuster le montant, la durée ou apporter des garanties.
+        {% else %}Capacité insuffisante. Renforcer revenus / réduire dettes avant de représenter le dossier.{% endif %}
+      </p>
+    </div>
+
+    {# Membre & profil financier #}
+    <div class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm">
+      <h2 class="text-base font-black"><i class="fa-solid fa-user text-[#0b55d9]"></i> Membre &amp; profil</h2>
+      <dl class="mt-4 grid gap-2 text-sm">
+        <div class="flex justify-between border-b border-[#edf2fb] pb-2"><dt class="font-bold text-[#536484]">Téléphone</dt><dd class="font-black">{{ member.phone|default:"—" }}</dd></div>
+        <div class="flex justify-between border-b border-[#edf2fb] pb-2"><dt class="font-bold text-[#536484]">Employeur</dt><dd class="font-black">{{ member.employer|default:"—" }}</dd></div>
+        <div class="flex justify-between border-b border-[#edf2fb] pb-2"><dt class="font-bold text-[#536484]">Fonction</dt><dd class="font-black">{{ member.job_function|default:"—" }}</dd></div>
+        <div class="flex justify-between border-b border-[#edf2fb] pb-2"><dt class="font-bold text-[#536484]">Personnes à charge</dt><dd class="font-black">{{ member.dependents_count|intcomma }}</dd></div>
+        <div class="flex justify-between"><dt class="font-bold text-[#536484]">Banque</dt><dd class="font-black">{{ member.bank.name|default:"—" }}</dd></div>
+      </dl>
+      {% if fin_profile %}
+      <div class="mt-4 rounded-xl bg-[#f7faff] p-3">
+        <p class="text-xs font-black uppercase text-[#667899]">Revenu disponible</p>
+        <b class="mt-1 block text-xl">{{ fin_profile.disposable_income|floatformat:0|intcomma }} {{ mutuelle.currency }}</b>
+      </div>
+      {% endif %}
+    </div>
+
+    {# Historique simulations du membre #}
+    {% if other_simulations %}
+    <div class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm">
+      <h2 class="text-base font-black"><i class="fa-solid fa-clock-rotate-left text-[#7c3aed]"></i> Autres simulations</h2>
+      <div class="mt-4 grid gap-2">
+        {% for sim in other_simulations %}
+          <a href="{% url 'simulation-detail' sim.id %}" class="flex items-center justify-between rounded-xl bg-[#f7faff] p-3 no-underline transition hover:bg-[#eef4ff]">
+            <div>
+              <b class="text-sm text-[#06194a]">{{ sim.requested_amount|floatformat:0|intcomma }} {{ mutuelle.currency }}</b>
+              <small class="block text-xs font-bold text-[#536484]">{{ sim.created_at|date:"d/m/Y" }} · {{ sim.requested_duration_months }} mois</small>
+            </div>
+            <span class="rounded-full px-2 py-1 text-xs font-black
+              {% if sim.decision == 'eligible' %}bg-[#e8fff2] text-[#0b9f5b]
+              {% elif sim.decision == 'conditional' %}bg-[#fff4e5] text-[#b56a00]
+              {% else %}bg-red-50 text-red-700{% endif %}">{{ sim.get_decision_display }}</span>
+          </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </aside>
+</section>
+{% endblock %}

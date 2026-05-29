@@ -2,9 +2,11 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.http import HttpResponse
 from django.db import models, transaction
 from django.db.models import Avg, Sum
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import login, update_session_auth_hash
 from django.contrib.auth.views import LoginView
+from django.urls import reverse
 from django.utils import timezone
 from decimal import Decimal
 import csv
@@ -53,6 +55,7 @@ from payments.services import initiate_mobile_money_payment, process_mobile_mone
 from reports.pdf import contribution_receipt_pdf, mutuelle_health_report_pdf
 from real_estate.models import (
     FinancingScenario,
+    MemberFinancialProfile,
     MortgageApplication,
     PropertyDocument,
     PropertyLot,
@@ -475,6 +478,57 @@ def mutuelles_list(request):
     return render(request, "dashboard/mutuelles_list.html", context)
 
 
+# Iconographie + palette par type d'objectif immobilier (FontAwesome 6)
+OBJECTIVE_ICON_MAP = {
+    "terrain":                  ("fa-solid fa-map",                "#b56a00", "#fff4e5"),
+    "maison":                   ("fa-solid fa-house-chimney",      "#0aa25f", "#e8fff2"),
+    "immeuble":                 ("fa-solid fa-building",           "#0b55d9", "#eaf2ff"),
+    "appartement":              ("fa-solid fa-city",               "#7c3aed", "#ede9fe"),
+    "logement_social":          ("fa-solid fa-hand-holding-heart", "#c93838", "#ffecec"),
+    "programme_promoteur":      ("fa-solid fa-handshake-angle",    "#06337d", "#dce8f8"),
+    "construction_collective":  ("fa-solid fa-people-group",       "#0aa25f", "#caff3d"),
+    "autre":                    ("fa-solid fa-circle-question",    "#536484", "#f3f7ff"),
+}
+
+
+def _aggregate_member_objectives(mutuelle):
+    """Agrège les objectifs immobiliers déclarés par les membres d'une mutuelle.
+
+    Retourne une liste ordonnée :
+        [{'code', 'label', 'count', 'pct', 'icon', 'color', 'bg'}, ...]
+    triée par nombre décroissant. Utile pour piloter le choix de programmes
+    immobiliers : on voit instantanément ce que veut la majorité des membres.
+    """
+    from collections import Counter
+
+    counter = Counter()
+    for values in Member.all_objects.filter(mutuelle=mutuelle).values_list(
+        "real_estate_objective", flat=True
+    ):
+        if values:
+            counter.update(values)
+
+    total_members = Member.all_objects.filter(mutuelle=mutuelle).count() or 1
+    label_map = dict(Mutuelle.RealEstateObjective.choices)
+    rows = []
+    for code, count in counter.items():
+        icon, color, bg = OBJECTIVE_ICON_MAP.get(
+            code, ("fa-solid fa-bullseye", "#0b55d9", "#eaf2ff")
+        )
+        rows.append(
+            {
+                "code": code,
+                "label": label_map.get(code, code),
+                "count": count,
+                "pct": round(count * 100 / total_members, 1),
+                "icon": icon,
+                "color": color,
+                "bg": bg,
+            }
+        )
+    return sorted(rows, key=lambda row: row["count"], reverse=True)
+
+
 @login_required
 def mutuelle_detail(request, mutuelle_id):
     """Page de détail d'une mutuelle.
@@ -507,6 +561,8 @@ def mutuelle_detail(request, mutuelle_id):
     applications_qs = MortgageApplication.all_objects.filter(mutuelle=mutuelle)
 
     members_total = members_qs.count()
+    # Agrégation des objectifs immobiliers déclarés par les membres
+    members_objectives = _aggregate_member_objectives(mutuelle)
     # KPI #2 : Capacité d'emprunt totale (mensualité cumulée déjà calculée dans _mutuelle_context)
     total_borrowing_capacity = context.get("quotite_mutuelle_monthly_capacity") or 0
     # KPI #4 : Budget estimé du projet possible = financement collectif max
@@ -523,6 +579,12 @@ def mutuelle_detail(request, mutuelle_id):
             "kpi_borrowing_capacity": total_borrowing_capacity,
             "kpi_solvency_score": solvency_score,
             "kpi_solvency_level": solvency_level,
+            # ---- Objectifs cumulés des membres ----
+            "members_objectives_aggregated": members_objectives,
+            "members_objectives_total_picks": sum(row["count"] for row in members_objectives),
+            "members_with_objective_count": members_qs.exclude(
+                real_estate_objective__exact=[]
+            ).count(),
             "kpi_project_budget": estimated_project_budget,
 
             # ---- Section Membres ----
@@ -604,6 +666,40 @@ def simulations_center(request):
     context["rejected_count"] = simulations_qs.filter(decision=QuotiteCessibleSimulation.Decision.REJECTED).count()
     context["avg_amortization_months"] = int(simulations_qs.aggregate(avg=Avg("requested_duration_months"))["avg"] or 0)
     return render(request, "dashboard/simulations.html", context)
+
+
+@login_required
+def simulation_detail(request, simulation_id):
+    """Fiche complète d'une simulation de quotité cessible."""
+    simulation = get_object_or_404(
+        QuotiteCessibleSimulation.all_objects.select_related(
+            "member", "member__bank", "member__financial_profile", "mutuelle"
+        ),
+        id=simulation_id,
+    )
+    member = simulation.member
+    mutuelle = simulation.mutuelle
+
+    # Comparaison avec les autres simulations du même membre
+    other_simulations = (
+        QuotiteCessibleSimulation.all_objects.filter(member=member, mutuelle=mutuelle)
+        .exclude(id=simulation.id)
+        .order_by("-created_at")[:5]
+    )
+
+    context = _global_context()
+    context.update(
+        {
+            "simulation": simulation,
+            "member": member,
+            "mutuelle": mutuelle,
+            "active_mutuelle": mutuelle,
+            "fin_profile": getattr(member, "financial_profile", None),
+            "other_simulations": other_simulations,
+            "active_tab": "simulations",
+        }
+    )
+    return render(request, "dashboard/simulation_detail.html", context)
 
 
 @login_required
@@ -830,6 +926,81 @@ def update_mutuelle_branding(request, mutuelle_id):
 
 
 @login_required
+def member_detail(request, member_id):
+    """Fiche complète d'un membre.
+
+    Affiche : identité, contact, famille, profession, banque, objectifs
+    immobiliers, profil financier, dernière simulation quotité,
+    cotisations, paiements, réservations, dettes déclarées.
+    """
+    member = get_object_or_404(
+        Member.all_objects.select_related("mutuelle", "bank"),
+        id=member_id,
+    )
+    mutuelle = member.mutuelle
+
+    # Profil financier (peut ne pas exister)
+    fin_profile = getattr(member, "financial_profile", None)
+
+    # Dernière simulation de quotité
+    last_simulation = (
+        QuotiteCessibleSimulation.all_objects.filter(mutuelle=mutuelle, member=member)
+        .order_by("-created_at")
+        .first()
+    )
+
+    # Activité récente
+    contributions = (
+        Contribution.all_objects.filter(mutuelle=mutuelle, member=member)
+        .select_related("plan")
+        .order_by("-created_at")[:10]
+    )
+    payments = (
+        Payment.all_objects.filter(mutuelle=mutuelle, member=member)
+        .order_by("-created_at")[:10]
+    )
+    reservations = (
+        PropertyReservation.all_objects.filter(mutuelle=mutuelle, member=member)
+        .select_related("lot", "lot__opportunity")
+        .order_by("-created_at")[:10]
+    )
+    claims = (
+        AssistanceClaim.all_objects.filter(mutuelle=mutuelle, member=member)
+        .order_by("-created_at")[:10]
+    )
+
+    # Engagements / dettes déclarés
+    from real_estate.models import DebtCommitment
+
+    debts = (
+        DebtCommitment.all_objects.filter(mutuelle=mutuelle, member=member)
+        .order_by("-created_at")
+    )
+
+    # KPI rapides du membre
+    paid_total = sum((c.amount for c in contributions if c.status == Contribution.Status.PAID), 0)
+
+    context = _global_context()
+    context.update(
+        {
+            "member": member,
+            "mutuelle": mutuelle,
+            "active_mutuelle": mutuelle,
+            "fin_profile": fin_profile,
+            "last_simulation": last_simulation,
+            "contributions": contributions,
+            "payments": payments,
+            "reservations": reservations,
+            "claims": claims,
+            "debts": debts,
+            "paid_total": paid_total,
+            "active_tab": "members",
+        }
+    )
+    return render(request, "dashboard/member_detail.html", context)
+
+
+@login_required
 @transaction.atomic
 def create_member(request):
     """Workflow d'enrôlement membre complet.
@@ -872,13 +1043,62 @@ def create_member(request):
 
 @login_required
 def create_financial_profile(request):
-    form = FinancialProfileForm(request.POST or None)
-    if request.method == "POST" and form.is_valid():
-        profile = form.save(commit=False)
-        profile.mutuelle = profile.member.mutuelle
-        profile.save()
+    """Création du profil financier d'un membre.
+
+    Le membre cible est résolu via :
+    1. `?member_id=` (GET) ou `member_id` POST hidden
+    2. Sinon : premier membre de la mutuelle active SANS profil financier
+       (workflow post-création membre)
+
+    Si aucun candidat trouvé, redirige vers la liste des membres.
+    """
+    active_mutuelle = _active_mutuelle(request)
+    if not active_mutuelle:
+        return redirect("create-mutuelle")
+
+    member_id = request.POST.get("member_id") or request.GET.get("member_id")
+    member = None
+    if member_id:
+        member = (
+            Member.all_objects.filter(id=member_id, mutuelle=active_mutuelle)
+            .select_related("mutuelle")
+            .first()
+        )
+    if member is None:
+        member = (
+            Member.all_objects.filter(
+                mutuelle=active_mutuelle, financial_profile__isnull=True
+            )
+            .select_related("mutuelle")
+            .order_by("-created_at")
+            .first()
+        )
+    if member is None:
+        return redirect("members-center")
+
+    # Évite la duplication : si le membre a déjà un profil, on redirige
+    if hasattr(member, "financial_profile") and member.financial_profile is not None:
         return redirect("simulations-center")
-    return _render_form(request, form, "Profil financier", "Renseignez revenus, charges et situation professionnelle.", "Enregistrer le profil", "members-center")
+
+    form = FinancialProfileForm(request.POST or None, member=member)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        return redirect("simulations-center")
+
+    context = _global_context()
+    context.update(
+        {
+            "form": form,
+            "target_member": member,
+            "active_mutuelle": active_mutuelle,
+            "title": f"Profil financier — {member.last_name} {member.first_name}",
+            "subtitle": "Revenus, charges, dettes et situation professionnelle. Ces données alimentent la quotité cessible et le scoring.",
+            "submit_label": "Enregistrer le profil",
+            "back_url": "members-center",
+            "active_tab": "members",
+        }
+    )
+    return render(request, "dashboard/form_financial_profile.html", context)
 
 
 @transaction.atomic
@@ -925,10 +1145,57 @@ def create_project(request):
 
 @login_required
 def create_simulation(request):
-    form = SimulationCreateForm(request.POST or None)
+    """Lance une simulation de quotité cessible pour un membre donné.
+
+    Résolution du membre cible :
+    1. `?member_id=` (GET) ou `member_id` (POST hidden)
+    2. À défaut : premier membre de la mutuelle active
+
+    Garde-fous :
+    - Aucune mutuelle active → ``create-mutuelle``
+    - Aucun membre dans la mutuelle → ``members-center``
+    - Membre sans profil financier → ``create-financial-profile?member_id=…``
+      avec un message ``warning`` (la simulation a besoin des revenus/charges).
+    """
+    active_mutuelle = _active_mutuelle(request)
+    if not active_mutuelle:
+        return redirect("create-mutuelle")
+
+    member_id = request.POST.get("member_id") or request.GET.get("member_id")
+    member = None
+    if member_id:
+        member = (
+            Member.all_objects.filter(id=member_id, mutuelle=active_mutuelle)
+            .select_related("mutuelle")
+            .first()
+        )
+    if member is None:
+        member = (
+            Member.all_objects.filter(mutuelle=active_mutuelle)
+            .select_related("mutuelle")
+            .order_by("-created_at")
+            .first()
+        )
+    if member is None:
+        return redirect("members-center")
+
+    # Garde-fou : impossible de simuler sans profil financier (revenus / charges).
+    # Le service simulate_quotite() y accède directement → on bloque proprement
+    # avec un message explicite + redirection vers la création du profil.
+    if not MemberFinancialProfile.all_objects.filter(member=member).exists():
+        messages.warning(
+            request,
+            f"Le profil financier de {member.last_name.upper()} {member.first_name} "
+            "n'est pas encore renseigné. Saisissez d'abord les revenus, charges et "
+            "engagements pour pouvoir lancer la simulation de quotité cessible.",
+        )
+        return redirect(
+            f"{reverse('create-financial-profile')}?member_id={member.id}"
+        )
+
+    form = SimulationCreateForm(request.POST or None, member=member)
     if request.method == "POST" and form.is_valid():
         data = form.cleaned_data
-        member = data["member"]
         simulate_quotite(
             member.mutuelle,
             member,
@@ -937,8 +1204,23 @@ def create_simulation(request):
             data["annual_interest_rate"],
             data["max_debt_ratio"],
         )
-        return redirect("simulations-center")
-    return _render_form(request, form, "Lancer une simulation", "Calculez quotité cessible, mensualité, reste à vivre et décision.", "Lancer la simulation", "simulations-center")
+        return redirect("member-detail", member_id=member.id)
+
+    context = _global_context()
+    context.update(
+        {
+            "form": form,
+            "target_member": member,
+            "active_mutuelle": active_mutuelle,
+            "title": f"Lancer une simulation — {member.last_name.upper()} {member.first_name}",
+            "subtitle": "Calculez quotité cessible, mensualité, reste à vivre et décision pour ce membre.",
+            "submit_label": "Lancer la simulation",
+            "back_url": "member-detail",
+            "back_kwargs": {"member_id": member.id},
+            "active_tab": "members",
+        }
+    )
+    return render(request, "dashboard/form_simulation.html", context)
 
 
 @login_required

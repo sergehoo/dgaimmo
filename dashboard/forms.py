@@ -456,6 +456,10 @@ class MemberCreateForm(StyledModelForm):
         # niveau modèle (status=PROSPECT, kyc_validated=False) et sont
         # modifiés ensuite via les écrans dédiés (workflow KYC, gestion
         # statut adhésion).
+        # Note : les champs "vie professionnelle" (employer, job_function,
+        # hire_date, professional_seniority_months) restent dans le modèle
+        # mais sont retirés du formulaire d'enrôlement initial. Ils peuvent
+        # être saisis ensuite via les écrans dédiés (profil financier).
         fields = [
             "member_code",
             # Identité
@@ -467,11 +471,6 @@ class MemberCreateForm(StyledModelForm):
             "birth_place",
             "gender",
             "national_id",
-            # Vie pro
-            "employer",
-            "job_function",
-            "hire_date",
-            "professional_seniority_months",
             # Famille
             "marital_status",
             "spouse_name",
@@ -479,11 +478,11 @@ class MemberCreateForm(StyledModelForm):
             # Banque
             "bank",
             "bank_account_number",
+            # Objectifs immobiliers personnels (multi-select)
+            "real_estate_objective",
         ]
         widgets = {
             "birth_date": forms.DateInput(attrs={"type": "date"}),
-            "hire_date": forms.DateInput(attrs={"type": "date"}),
-            "professional_seniority_months": forms.NumberInput(attrs={"min": 0, "step": 1}),
             "dependents_count": forms.NumberInput(attrs={"min": 0, "step": 1}),
         }
         labels = {
@@ -496,15 +495,12 @@ class MemberCreateForm(StyledModelForm):
             "birth_place": "Lieu de naissance",
             "gender": "Genre",
             "national_id": "CNI / Passeport",
-            "employer": "Entreprise / employeur",
-            "job_function": "Fonction dans l'entreprise",
-            "hire_date": "Date d'embauche",
-            "professional_seniority_months": "Ancienneté (mois)",
             "marital_status": "Situation matrimoniale",
             "spouse_name": "Nom du conjoint",
             "dependents_count": "Personnes à charge",
             "bank": "Banque affiliée",
             "bank_account_number": "Numéro de compte / IBAN",
+            "real_estate_objective": "Objectifs immobiliers personnels",
         }
 
     def __init__(self, *args, mutuelle=None, **kwargs):
@@ -521,6 +517,20 @@ class MemberCreateForm(StyledModelForm):
         self.fields["bank"].queryset = Bank.objects.filter(active=True).order_by("name")
         self.fields["bank"].required = False
         self.fields["bank"].empty_label = "— Aucune / non renseignée —"
+
+        # JSONField rendu en MultipleChoiceField (checkboxes) — choices
+        # alignées sur celles de Mutuelle.RealEstateObjective pour cohérence.
+        self.fields["real_estate_objective"] = forms.MultipleChoiceField(
+            label="Objectifs immobiliers personnels",
+            choices=Mutuelle.RealEstateObjective.choices,
+            widget=forms.CheckboxSelectMultiple(attrs={"class": "mx-objective-checkboxes"}),
+            required=False,
+            help_text="Que vise ce membre à terme ? (sélection multiple)",
+        )
+        instance = kwargs.get("instance") or getattr(self, "instance", None)
+        if instance and isinstance(getattr(instance, "real_estate_objective", None), list):
+            self.initial["real_estate_objective"] = instance.real_estate_objective
+
         # Champs requis pour le workflow
         for required in ("first_name", "last_name", "phone"):
             self.fields[required].required = True
@@ -532,8 +542,6 @@ class MemberCreateForm(StyledModelForm):
             "email": "membre@email.ci",
             "birth_place": "Abidjan, CI",
             "national_id": "CI001234567",
-            "employer": "SocieteX SARL",
-            "job_function": "Responsable RH, Comptable, Ingénieur...",
             "spouse_name": "Nom et prénoms du conjoint",
             "bank_account_number": "CI93 CI16 0103 0000 0000 0000 0000",
         }
@@ -561,6 +569,10 @@ class MemberCreateForm(StyledModelForm):
     def clean_email(self):
         email = (self.cleaned_data.get("email") or "").strip().lower()
         return email
+
+    def clean_real_estate_objective(self):
+        values = self.cleaned_data.get("real_estate_objective") or []
+        return list(values)
 
     def _generate_member_code(self, mutuelle):
         slug_prefix = "".join(char for char in mutuelle.slug.upper() if char.isalnum())[:4] or "MEMB"
@@ -592,19 +604,15 @@ class MemberCreateForm(StyledModelForm):
 class FinancialProfileForm(StyledModelForm):
     """Profil financier : revenus, charges, dettes, situation pro.
 
-    Synchronise automatiquement `dependents_count` et `professional_seniority_months`
-    depuis le membre si déjà saisis sur sa fiche.
+    Le membre est injecté par la vue (kwarg `member=`) — l'utilisateur ne
+    le sélectionne JAMAIS depuis ce formulaire. La saisie est contextuelle :
+    elle se fait depuis la fiche du membre. Cela évite les erreurs de
+    rattachement et garantit l'isolation tenant.
     """
-
-    member = forms.ModelChoiceField(
-        queryset=Member.all_objects.select_related("mutuelle"),
-        label="Membre",
-    )
 
     class Meta:
         model = MemberFinancialProfile
         fields = [
-            "member",
             # Revenus
             "net_monthly_salary",
             "complementary_income",
@@ -650,12 +658,40 @@ class FinancialProfileForm(StyledModelForm):
             "risk_level": "Niveau de risque",
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, member=None, **kwargs):
+        """
+        Args:
+            member: Membre auquel rattacher le profil financier. Doit être
+                fourni par la vue (depuis ?member_id= ou contexte).
+        """
         super().__init__(*args, **kwargs)
-        self.fields["member"].queryset = (
-            Member.all_objects.filter(financial_profile__isnull=True).select_related("mutuelle")
-        )
+        self._member = member
+        # Pré-remplit dependents_count et ancienneté depuis la fiche membre
+        if member is not None:
+            self.initial.setdefault("dependents_count", member.dependents_count or 0)
+            self.initial.setdefault(
+                "professional_seniority_months", member.professional_seniority_months or 0
+            )
         self._style_fields()
+
+    def clean(self):
+        cleaned = super().clean()
+        if not self._member:
+            raise forms.ValidationError(
+                "Aucun membre cible n'est fourni. Ouvrez le profil financier depuis "
+                "la fiche du membre."
+            )
+        return cleaned
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        # Rattachement automatique au membre + mutuelle (jamais saisi)
+        if self._member is not None:
+            instance.member = self._member
+            instance.mutuelle = self._member.mutuelle
+        if commit:
+            instance.save()
+        return instance
 
 
 class ProjectCreateForm(forms.Form):
@@ -677,16 +713,36 @@ class ProjectCreateForm(forms.Form):
 
 
 class SimulationCreateForm(forms.Form):
-    member = forms.ModelChoiceField(queryset=Member.all_objects.select_related("mutuelle"), label="Membre")
+    """Formulaire de simulation de quotité cessible.
+
+    Le membre est injecté par la vue (kwarg `member=`) — l'utilisateur ne
+    le sélectionne JAMAIS depuis ce formulaire. Le contexte d'appel est
+    toujours explicite (depuis la fiche du membre ou un workflow).
+    """
+
     requested_amount = forms.DecimalField(label="Montant demandé", max_digits=14, decimal_places=2)
     requested_duration_months = forms.IntegerField(label="Période d'amortissement (mois)", min_value=1, initial=120)
     annual_interest_rate = forms.DecimalField(label="Taux annuel (%)", max_digits=5, decimal_places=2, initial=7)
     max_debt_ratio = forms.DecimalField(label="Taux d'endettement max (%)", max_digits=5, decimal_places=2, initial=33)
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, member=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self._member = member
         for field in self.fields.values():
-            field.widget.attrs.setdefault("class", BASE_SELECT if isinstance(field.widget, forms.Select) else BASE_INPUT)
+            field.widget.attrs.setdefault(
+                "class",
+                BASE_SELECT if isinstance(field.widget, forms.Select) else BASE_INPUT,
+            )
+
+    def clean(self):
+        cleaned = super().clean()
+        if not self._member:
+            raise forms.ValidationError(
+                "Aucun membre cible n'est fourni. Ouvrez la simulation depuis "
+                "la fiche du membre."
+            )
+        cleaned["member"] = self._member
+        return cleaned
 
 
 class FinancingScenarioCreateForm(forms.Form):

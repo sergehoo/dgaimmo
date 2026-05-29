@@ -89,32 +89,6 @@
       </div>
     </div>
 
-    {# --------- Bloc 3 : Vie professionnelle --------- #}
-    <h2 class="mb-3 mt-8 text-lg font-black text-[#06194a]">Vie professionnelle</h2>
-    <div class="grid gap-5 md:grid-cols-2">
-      <div>
-        <label class="mb-2 block text-sm font-black text-[#06194a]" for="{{ form.employer.id_for_label }}">{{ form.employer.label }}</label>
-        {{ form.employer }}
-        {% for error in form.employer.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
-      </div>
-      <div>
-        <label class="mb-2 block text-sm font-black text-[#06194a]" for="{{ form.job_function.id_for_label }}">{{ form.job_function.label }}</label>
-        {{ form.job_function }}
-        {% for error in form.job_function.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
-      </div>
-      <div>
-        <label class="mb-2 block text-sm font-black text-[#06194a]" for="{{ form.hire_date.id_for_label }}">{{ form.hire_date.label }}</label>
-        {{ form.hire_date }}
-        {% for error in form.hire_date.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
-      </div>
-      <div>
-        <label class="mb-2 block text-sm font-black text-[#06194a]" for="{{ form.professional_seniority_months.id_for_label }}">{{ form.professional_seniority_months.label }}</label>
-        {{ form.professional_seniority_months }}
-        {% if form.professional_seniority_months.help_text %}<p class="mt-1 text-xs font-semibold text-[#536484]">{{ form.professional_seniority_months.help_text }}</p>{% endif %}
-        {% for error in form.professional_seniority_months.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
-      </div>
-    </div>
-
     {# --------- Bloc 4 : Situation familiale --------- #}
     <h2 class="mb-3 mt-8 text-lg font-black text-[#06194a]">Situation familiale</h2>
     <div class="grid gap-5 md:grid-cols-3">
@@ -136,7 +110,25 @@
       </div>
     </div>
 
-    {# --------- Bloc 5 : Banque affiliée --------- #}
+    {# --------- Bloc 5 : Objectifs immobiliers personnels --------- #}
+    <h2 class="mb-3 mt-8 text-lg font-black text-[#06194a]"><i class="fa-solid fa-bullseye text-[#0aa25f]"></i> Objectifs immobiliers personnels</h2>
+    <div class="grid gap-5">
+      <div>
+        <label class="mb-2 block text-sm font-black text-[#06194a]">{{ form.real_estate_objective.label }}</label>
+        <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 rounded-2xl border border-[#e5edf8] bg-[#f7faff] p-4">
+          {% for choice in form.real_estate_objective %}
+            <label class="flex cursor-pointer items-center gap-3 rounded-xl border border-transparent bg-white px-3 py-3 text-sm font-bold text-[#06194a] transition hover:border-[#0b55d9]">
+              {{ choice.tag }}
+              <span>{{ choice.choice_label }}</span>
+            </label>
+          {% endfor %}
+        </div>
+        {% if form.real_estate_objective.help_text %}<p class="mt-1 text-xs font-semibold text-[#536484]">{{ form.real_estate_objective.help_text }}</p>{% endif %}
+        {% for error in form.real_estate_objective.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+    </div>
+
+    {# --------- Bloc 6 : Banque affiliée --------- #}
     <h2 class="mb-3 mt-8 text-lg font-black text-[#06194a]">Banque affiliée</h2>
     <div class="grid gap-5 md:grid-cols-2">
       <div>

@@ -1,0 +1,151 @@
+{% extends "dashboard/console_base.html" %}
+{% block console_content %}
+<div class="mb-7 flex flex-wrap items-center justify-between gap-4">
+  <div>
+    <p class="text-sm font-bold text-[#536484]">MutuelleX · Workflow profil financier</p>
+    <h1 class="text-3xl font-black">{{ title }}</h1>
+    <p class="mt-2 max-w-3xl text-sm font-semibold text-[#536484]">{{ subtitle }}</p>
+  </div>
+  <a href="{% url back_url %}" class="rounded-xl border border-[#dce7f6] bg-white px-5 py-3 text-sm font-black text-[#06337d] no-underline">Retour</a>
+</div>
+
+{% if messages %}
+<div class="mb-5 grid gap-3">
+  {% for msg in messages %}
+    <div class="flex items-start gap-3 rounded-2xl border p-4 text-sm font-bold
+      {% if 'warning' in msg.tags %}border-[#facc15] bg-[#fff7df] text-[#854d0e]
+      {% elif 'error' in msg.tags %}border-red-200 bg-red-50 text-red-700
+      {% elif 'success' in msg.tags %}border-[#86efac] bg-[#e8fff2] text-[#0b9f5b]
+      {% else %}border-[#dbe6f5] bg-[#f7faff] text-[#06337d]{% endif %}">
+      <i class="fa-solid {% if 'warning' in msg.tags %}fa-triangle-exclamation{% elif 'error' in msg.tags %}fa-circle-xmark{% elif 'success' in msg.tags %}fa-circle-check{% else %}fa-circle-info{% endif %} mt-0.5"></i>
+      <div>{{ msg }}</div>
+    </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<section class="grid gap-6 xl:grid-cols-[1fr_.42fr]">
+  <form method="post" class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm">
+    {% csrf_token %}
+    <input type="hidden" name="member_id" value="{{ target_member.id }}">
+    {% if form.non_field_errors %}
+      <div class="mb-5 rounded-xl bg-red-50 p-4 text-sm font-bold text-red-700">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    {# --------- Bandeau membre cible (lecture seule) --------- #}
+    <h2 class="mb-3 text-lg font-black text-[#06194a]"><i class="fa-solid fa-id-card text-[#0b55d9]"></i> Membre concerné</h2>
+    <div class="mb-6 flex items-center gap-4 rounded-2xl border border-[#dbe6f5] bg-[#f7faff] p-4">
+      <span class="grid h-12 w-12 flex-none place-items-center rounded-xl bg-[#0b55d9] text-sm font-black text-white">
+        {{ target_member.first_name|slice:":1" }}{{ target_member.last_name|slice:":1" }}
+      </span>
+      <div class="min-w-0">
+        <b class="block text-base">{{ target_member.last_name|upper }} {{ target_member.first_name }}</b>
+        <small class="block text-xs font-bold text-[#536484]">
+          {{ target_member.member_code }} · {{ target_member.phone }}
+          {% if target_member.employer %} · {{ target_member.employer }}{% endif %}
+          {% if target_member.job_function %} · {{ target_member.job_function }}{% endif %}
+        </small>
+      </div>
+      <span class="ml-auto rounded-full bg-white px-3 py-1 text-xs font-black text-[#0b55d9]">{{ active_mutuelle.name }}</span>
+    </div>
+
+    {# --------- Bloc 1 : Revenus --------- #}
+    <h2 class="mb-3 text-lg font-black text-[#06194a]"><i class="fa-solid fa-money-bill-trend-up text-[#0aa25f]"></i> Revenus mensuels</h2>
+    <div class="grid gap-5 md:grid-cols-3">
+      <div>
+        <label class="mb-2 block text-sm font-black text-[#06194a]" for="{{ form.net_monthly_salary.id_for_label }}">{{ form.net_monthly_salary.label }} <span class="text-red-500">*</span></label>
+        {{ form.net_monthly_salary }}
+        {% for error in form.net_monthly_salary.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+      <div>
+        <label class="mb-2 block text-sm font-black text-[#06194a]" for="{{ form.complementary_income.id_for_label }}">{{ form.complementary_income.label }}</label>
+        {{ form.complementary_income }}
+        {% for error in form.complementary_income.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+      <div>
+        <label class="mb-2 block text-sm font-black text-[#06194a]" for="{{ form.pensions.id_for_label }}">{{ form.pensions.label }}</label>
+        {{ form.pensions }}
+        {% for error in form.pensions.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+    </div>
+
+    {# --------- Bloc 2 : Charges --------- #}
+    <h2 class="mb-3 mt-8 text-lg font-black text-[#06194a]"><i class="fa-solid fa-receipt text-[#b56a00]"></i> Charges &amp; engagements</h2>
+    <div class="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+      <div>
+        <label class="mb-2 block text-sm font-black text-[#06194a]" for="{{ form.fixed_charges.id_for_label }}">{{ form.fixed_charges.label }}</label>
+        {{ form.fixed_charges }}
+        {% for error in form.fixed_charges.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+      <div>
+        <label class="mb-2 block text-sm font-black text-[#06194a]" for="{{ form.existing_loan_payments.id_for_label }}">{{ form.existing_loan_payments.label }}</label>
+        {{ form.existing_loan_payments }}
+        {% if form.existing_loan_payments.help_text %}<p class="mt-1 text-xs font-semibold text-[#536484]">{{ form.existing_loan_payments.help_text }}</p>{% endif %}
+        {% for error in form.existing_loan_payments.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+      <div>
+        <label class="mb-2 block text-sm font-black text-[#06194a]" for="{{ form.other_debts.id_for_label }}">{{ form.other_debts.label }}</label>
+        {{ form.other_debts }}
+        {% if form.other_debts.help_text %}<p class="mt-1 text-xs font-semibold text-[#536484]">{{ form.other_debts.help_text }}</p>{% endif %}
+        {% for error in form.other_debts.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+      <div>
+        <label class="mb-2 block text-sm font-black text-[#06194a]" for="{{ form.pensions_paid.id_for_label }}">{{ form.pensions_paid.label }}</label>
+        {{ form.pensions_paid }}
+        {% for error in form.pensions_paid.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+      <div>
+        <label class="mb-2 block text-sm font-black text-[#06194a]" for="{{ form.mutual_contributions.id_for_label }}">{{ form.mutual_contributions.label }}</label>
+        {{ form.mutual_contributions }}
+        {% for error in form.mutual_contributions.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+    </div>
+
+    {# --------- Bloc 3 : Situation pro & familiale --------- #}
+    <h2 class="mb-3 mt-8 text-lg font-black text-[#06194a]"><i class="fa-solid fa-briefcase text-[#7c3aed]"></i> Situation professionnelle</h2>
+    <div class="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+      <div>
+        <label class="mb-2 block text-sm font-black text-[#06194a]" for="{{ form.employment_type.id_for_label }}">{{ form.employment_type.label }}</label>
+        {{ form.employment_type }}
+        {% for error in form.employment_type.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+      <div>
+        <label class="mb-2 block text-sm font-black text-[#06194a]" for="{{ form.contract_type.id_for_label }}">{{ form.contract_type.label }}</label>
+        {{ form.contract_type }}
+        {% for error in form.contract_type.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+      <div>
+        <label class="mb-2 block text-sm font-black text-[#06194a]" for="{{ form.professional_seniority_months.id_for_label }}">{{ form.professional_seniority_months.label }}</label>
+        {{ form.professional_seniority_months }}
+        {% for error in form.professional_seniority_months.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+      <div>
+        <label class="mb-2 block text-sm font-black text-[#06194a]" for="{{ form.dependents_count.id_for_label }}">{{ form.dependents_count.label }}</label>
+        {{ form.dependents_count }}
+        {% for error in form.dependents_count.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+      <div>
+        <label class="mb-2 block text-sm font-black text-[#06194a]" for="{{ form.risk_level.id_for_label }}">{{ form.risk_level.label }}</label>
+        {{ form.risk_level }}
+        {% for error in form.risk_level.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+    </div>
+
+    <div class="mt-8 flex flex-wrap gap-3">
+      <button type="submit" class="rounded-xl bg-[#0b55d9] px-6 py-4 text-sm font-black text-white shadow-lg shadow-blue-900/20"><i class="fa-solid fa-floppy-disk"></i> {{ submit_label }}</button>
+      <a href="{% url back_url %}" class="rounded-xl border border-[#dce7f6] bg-white px-6 py-4 text-sm font-black text-[#06194a] no-underline">Annuler</a>
+    </div>
+  </form>
+
+  <aside class="rounded-2xl bg-[#06194a] p-7 text-white shadow-2xl shadow-blue-950/15">
+    <span class="text-xs font-black uppercase text-[#72e7a6]"><i class="fa-solid fa-circle-info"></i> Aide à la saisie</span>
+    <h2 class="mt-4 text-2xl font-black">Profil financier &amp; quotité</h2>
+    <div class="mt-6 grid gap-4 text-sm text-white/80">
+      <p class="rounded-2xl bg-white/10 p-4"><b class="block text-white"><i class="fa-solid fa-coins text-[#cfff3d]"></i> Revenu total</b><span class="mt-1 block">Salaire + revenus complémentaires + pensions reçues. Base du calcul de quotité cessible.</span></p>
+      <p class="rounded-2xl bg-white/10 p-4"><b class="block text-white"><i class="fa-solid fa-scale-balanced text-[#cfff3d]"></i> Charges &amp; dettes</b><span class="mt-1 block">Loyer, prêts en cours, dettes diverses, pensions versées et cotisations mutuelle. Détermine le reste à vivre.</span></p>
+      <p class="rounded-2xl bg-white/10 p-4"><b class="block text-white"><i class="fa-solid fa-chart-line text-[#cfff3d]"></i> Statut professionnel</b><span class="mt-1 block">Public / privé / indépendant / informel influence le scoring (stabilité du revenu).</span></p>
+      <p class="rounded-2xl bg-white/10 p-4 text-[#cfff3d]"><i class="fa-solid fa-lightbulb"></i> Pré-rempli depuis la fiche membre quand possible (ancienneté, personnes à charge).</p>
+    </div>
+  </aside>
+</section>
+{% endblock %}

@@ -450,9 +450,21 @@ CSP_SCRIPT_SRC = (
     "https://cdn.tailwindcss.com",
     "https://unpkg.com",
     "https://cdn.jsdelivr.net",
+    "https://cdnjs.cloudflare.com",      # FontAwesome
 )
-CSP_STYLE_SRC = ("'self'", "'unsafe-inline'")
-CSP_IMG_SRC = ("'self'", "data:", "blob:")
+CSP_STYLE_SRC = (
+    "'self'",
+    "'unsafe-inline'",
+    "https://cdnjs.cloudflare.com",      # FontAwesome CSS
+    "https://fonts.googleapis.com",      # éventuelles Google Fonts
+)
+CSP_FONT_SRC = (
+    "'self'",
+    "data:",
+    "https://cdnjs.cloudflare.com",      # FontAwesome .woff2
+    "https://fonts.gstatic.com",
+)
+CSP_IMG_SRC = ("'self'", "data:", "blob:", "https://images.unsplash.com")
 CSP_CONNECT_SRC = ("'self'",)
 
 

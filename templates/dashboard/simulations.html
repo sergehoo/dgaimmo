@@ -13,10 +13,21 @@
 <section class="mt-6 rounded-2xl border border-[#e5edf8] bg-white p-5 shadow-sm">
   <div class="overflow-x-auto">
     <table class="w-full min-w-[860px] text-left text-sm">
-      <thead class="bg-[#f7faff] text-xs uppercase text-[#536484]"><tr><th class="px-4 py-4">Membre</th><th>Mutuelle</th><th>Montant demandé</th><th>Période d'amortissement</th><th>Mensualité</th><th>Taux endettement</th><th>Décision</th></tr></thead>
+      <thead class="bg-[#f7faff] text-xs uppercase text-[#536484]"><tr><th class="px-4 py-4">Membre</th><th>Mutuelle</th><th>Montant demandé</th><th>Période d'amortissement</th><th>Mensualité</th><th>Taux endettement</th><th>Décision</th><th class="px-4 py-4 text-right">Action</th></tr></thead>
       <tbody class="divide-y divide-[#edf2fb]">
         {% for simulation in simulations %}
-        <tr class="font-bold"><td class="px-4 py-4">{{ simulation.member.first_name }} {{ simulation.member.last_name }}</td><td>{{ simulation.mutuelle.name }}</td><td>{{ simulation.requested_amount|floatformat:0|intcomma }}</td><td>{{ simulation.requested_duration_months|intcomma }} mois</td><td>{{ simulation.estimated_payment|floatformat:0|intcomma }}</td><td>{{ simulation.debt_ratio|floatformat:1 }}%</td><td>{{ simulation.get_decision_display }}</td></tr>
+        <tr class="cursor-pointer font-bold transition hover:bg-[#f7faff]" onclick="window.location='{% url 'simulation-detail' simulation.id %}'">
+          <td class="px-4 py-4"><a href="{% url 'member-detail' simulation.member.id %}" class="text-[#06194a] no-underline hover:text-[#0b55d9]" onclick="event.stopPropagation()">{{ simulation.member.last_name|upper }} {{ simulation.member.first_name }}</a></td>
+          <td>{{ simulation.mutuelle.name }}</td>
+          <td>{{ simulation.requested_amount|floatformat:0|intcomma }}</td>
+          <td>{{ simulation.requested_duration_months|intcomma }} mois</td>
+          <td>{{ simulation.estimated_payment|floatformat:0|intcomma }}</td>
+          <td>{{ simulation.debt_ratio|floatformat:1 }}%</td>
+          <td><span class="rounded-full px-2 py-1 text-xs font-black {% if simulation.decision == 'eligible' %}bg-[#e8fff2] text-[#0b9f5b]{% elif simulation.decision == 'conditional' %}bg-[#fff4e5] text-[#b56a00]{% else %}bg-red-50 text-red-700{% endif %}">{{ simulation.get_decision_display }}</span></td>
+          <td class="px-4 py-4 text-right"><a href="{% url 'simulation-detail' simulation.id %}" class="inline-flex items-center gap-1 rounded-xl bg-[#eaf2ff] px-3 py-2 text-xs font-black text-[#0b55d9] no-underline" onclick="event.stopPropagation()"><i class="fa-solid fa-arrow-up-right-from-square"></i> Détail</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="8" class="px-4 py-8 text-center text-sm font-bold text-[#667899]">Aucune simulation. <a href="{% url 'create-simulation' %}" class="text-[#0b55d9]">+ Lancer la première simulation →</a></td></tr>
         {% endfor %}
       </tbody>
     </table>
