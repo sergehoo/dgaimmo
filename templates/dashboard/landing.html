@@ -264,10 +264,25 @@
                                class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#0b55d9]"
                                placeholder="Ex. 25 000 000">
                       </div>
+                      <div>
+                        <label class="mb-1 flex items-center justify-between text-xs font-black uppercase text-[#536484]">
+                          <span><i class="fa-solid fa-building-columns"></i> Banque (optionnel — auto-remplit le taux)</span>
+                          <span x-show="credit.bank_id" x-cloak class="rounded-full bg-[#e8fff2] px-2 py-0.5 text-[10px] text-[#0b9f5b]">Taux appliqué</span>
+                        </label>
+                        <select x-model="credit.bank_id" @change="applyBankRate('credit')"
+                                class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#0b55d9]">
+                          <option value="">— Saisie manuelle du taux —</option>
+                          <template x-for="b in banks" :key="b.id">
+                            <option :value="b.id" x-text="b.name + (b.rate ? ' · ' + b.rate + ' %' : '')"></option>
+                          </template>
+                        </select>
+                      </div>
                       <div class="grid gap-4 sm:grid-cols-2">
                         <div>
                           <label class="mb-1 block text-xs font-black uppercase text-[#536484]">Taux annuel (%)</label>
                           <input type="number" min="0" max="50" step="0.1" x-model.number="credit.rate"
+                                 :disabled="!!credit.bank_id"
+                                 :class="credit.bank_id ? 'cursor-not-allowed bg-[#f7faff] text-[#536484]' : ''"
                                  class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#0b55d9]">
                         </div>
                         <div>
@@ -349,6 +364,20 @@
                         </div>
                       </div>
 
+                      <div>
+                        <label class="mb-1 flex items-center justify-between text-xs font-black uppercase text-[#536484]">
+                          <span><i class="fa-solid fa-building-columns"></i> Banque (optionnel — auto-remplit le taux)</span>
+                          <span x-show="quotite.bank_id" x-cloak class="rounded-full bg-[#e8fff2] px-2 py-0.5 text-[10px] text-[#0b9f5b]">Taux appliqué</span>
+                        </label>
+                        <select x-model="quotite.bank_id" @change="applyBankRate('quotite')"
+                                class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#7c3aed]">
+                          <option value="">— Saisie manuelle du taux —</option>
+                          <template x-for="b in banks" :key="b.id">
+                            <option :value="b.id" x-text="b.name + (b.rate ? ' · ' + b.rate + ' %' : '')"></option>
+                          </template>
+                        </select>
+                      </div>
+
                       <div class="grid gap-4 sm:grid-cols-3">
                         <div>
                           <label class="mb-1 block text-xs font-black uppercase text-[#536484]">Taux endettement max (%)</label>
@@ -358,6 +387,8 @@
                         <div>
                           <label class="mb-1 block text-xs font-black uppercase text-[#536484]">Taux annuel (%)</label>
                           <input type="number" min="0" max="50" step="0.1" x-model.number="quotite.annual_rate"
+                                 :disabled="!!quotite.bank_id"
+                                 :class="quotite.bank_id ? 'cursor-not-allowed bg-[#f7faff] text-[#536484]' : ''"
                                  class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#7c3aed]">
                         </div>
                         <div>
@@ -916,11 +947,44 @@
         return {
           tab: 'credit',
           fmt,
+          banks: [],
+          // Init : charge la liste des banques au mount
+          async init() {
+            try {
+              const resp = await fetch("{% url 'public-banks-list' %}", {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+              });
+              const data = await resp.json();
+              if (data.ok) this.banks = data.banks;
+            } catch (e) { /* silencieux : le simulateur reste utilisable en saisie manuelle */ }
+          },
+          // Auto-fill du taux quand l'utilisateur sélectionne une banque
+          applyBankRate(target) {
+            const id = this[target].bank_id;
+            if (!id) return;
+            const bank = this.banks.find(b => b.id === id);
+            if (bank && bank.rate !== null && bank.rate !== undefined) {
+              if (target === 'credit') {
+                this.credit.rate = bank.rate;
+                // Bornage durée si la banque a une durée max
+                if (bank.max_months && this.credit.months > bank.max_months) {
+                  this.credit.months = bank.max_months;
+                }
+              } else if (target === 'quotite') {
+                this.quotite.annual_rate = bank.rate;
+                if (bank.max_months && this.quotite.duration_months > bank.max_months) {
+                  this.quotite.duration_months = bank.max_months;
+                }
+              }
+            }
+          },
           // ---- Crédit ----
           credit: {
             amount: 25000000,
             rate: 7,
             months: 120,
+            bank_id: '',
             loading: false,
             error: '',
             result: null,
@@ -938,7 +1002,7 @@
             finally { this.credit.loading = false; }
           },
           resetCredit() {
-            this.credit = { amount: 25000000, rate: 7, months: 120, loading: false, error: '', result: null };
+            this.credit = { amount: 25000000, rate: 7, months: 120, bank_id: '', loading: false, error: '', result: null };
           },
           // ---- Quotité cessible ----
           quotite: {
@@ -950,6 +1014,7 @@
             annual_rate: 7,
             duration_months: 180,
             requested_amount: 0,
+            bank_id: '',
             loading: false,
             error: '',
             result: null,
@@ -970,7 +1035,7 @@
             this.quotite = {
               net_salary: 600000, complementary_income: 0, fixed_charges: 150000, existing_loans: 0,
               max_debt_ratio: 33, annual_rate: 7, duration_months: 180, requested_amount: 0,
-              loading: false, error: '', result: null,
+              bank_id: '', loading: false, error: '', result: null,
             };
           },
         };

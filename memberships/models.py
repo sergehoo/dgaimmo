@@ -23,6 +23,27 @@ class Bank(TimeStampedModel):
     )
     active = models.BooleanField(default=True, db_index=True)
 
+    # --- Conditions de crédit immobilier indicatives ---
+    default_mortgage_rate = models.DecimalField(
+        "Taux annuel indicatif (%)",
+        max_digits=5,
+        decimal_places=2,
+        default=0,
+        help_text="Taux annuel TEG indicatif pour le crédit immobilier (peut varier selon profil).",
+    )
+    mortgage_max_duration_months = models.PositiveIntegerField(
+        "Durée max prêt immobilier (mois)",
+        default=240,
+        help_text="Durée maximale du prêt immobilier (240 mois = 20 ans par défaut).",
+    )
+    mortgage_min_amount = models.DecimalField(
+        "Montant minimum (FCFA)",
+        max_digits=14,
+        decimal_places=2,
+        default=0,
+        help_text="Montant minimum d'octroi pour un prêt immobilier.",
+    )
+
     class Meta:
         ordering = ["name"]
         indexes = [models.Index(fields=["country", "active"])]

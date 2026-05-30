@@ -35,6 +35,7 @@ from dashboard.views import (
     finance_export_csv,
     governance_center,
     landing_page,
+    public_banks_list,
     public_simulate_credit,
     public_simulate_quotite,
     submit_contact_request,
@@ -65,6 +66,7 @@ urlpatterns = [
     path("", landing_page, name="landing-page"),
     path("contact/", submit_contact_request, name="submit-contact-request"),
     # Simulateurs publics AJAX (sans auth, JSON)
+    path("api/public/banks/", public_banks_list, name="public-banks-list"),
     path("api/public/simulate-credit/", public_simulate_credit, name="public-simulate-credit"),
     path("api/public/simulate-quotite/", public_simulate_quotite, name="public-simulate-quotite"),
     path("creer-une-mutuelle/", public_mutuelle_signup, name="public-mutuelle-signup"),

@@ -471,6 +471,36 @@ def _json_error(message, status=400):
     return JsonResponse({"ok": False, "error": message}, status=status)
 
 
+def public_banks_list(request):
+    """GET JSON public : liste des banques actives avec leurs taux indicatifs.
+
+    Utilisé par les simulateurs publics de la landing pour pré-remplir le
+    taux annuel quand l'utilisateur sélectionne une banque.
+    """
+    from django.http import JsonResponse
+    from memberships.models import Bank
+
+    banks = (
+        Bank.objects.filter(active=True)
+        .order_by("name")
+        .values("id", "name", "code", "default_mortgage_rate",
+                "mortgage_max_duration_months", "is_partner", "website")
+    )
+    payload = [
+        {
+            "id": str(b["id"]),
+            "name": b["name"],
+            "code": b["code"],
+            "rate": float(b["default_mortgage_rate"]) if b["default_mortgage_rate"] else None,
+            "max_months": b["mortgage_max_duration_months"],
+            "is_partner": b["is_partner"],
+            "website": b["website"],
+        }
+        for b in banks
+    ]
+    return JsonResponse({"ok": True, "banks": payload})
+
+
 def public_simulate_credit(request):
     """POST AJAX : calcule la mensualité, l'intérêt total, le coût total
     d'un crédit immobilier à partir de (montant, taux annuel %, durée mois).
