@@ -1,5 +1,5 @@
 from django.shortcuts import get_object_or_404, redirect, render
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse
 from django.db import models, transaction
 from django.db.models import Avg, Sum
 from django.contrib import messages
@@ -95,6 +95,38 @@ class SecureLoginView(LoginView):
         email = self.request.POST.get("username", "")
         record_login_event(self.request, LoginEvent.Status.FAILED, email=email, metadata={"errors": form.errors.get_json_data()})
         return super().form_invalid(form)
+
+
+def _user_accessible_mutuelles(user):
+    """Retourne le QuerySet des Mutuelles accessibles à un utilisateur.
+
+    - Superuser → toutes les mutuelles.
+    - Utilisateur authentifié → uniquement les mutuelles où il a une
+      ``MutuelleMembership`` active.
+    - Anonyme → queryset vide.
+
+    Ce helper est la source de vérité pour l'isolation tenant : toute vue
+    qui agrège ou liste des données doit filtrer sur ce queryset.
+    """
+    if user is None or not getattr(user, "is_authenticated", False):
+        return Mutuelle.objects.none()
+    if user.is_superuser:
+        return Mutuelle.objects.all()
+    return Mutuelle.objects.filter(
+        staff_memberships__user=user,
+        staff_memberships__active=True,
+    ).distinct()
+
+
+def _user_can_access_mutuelle(user, mutuelle) -> bool:
+    """Garde-fou : retourne True si l'utilisateur peut voir cette mutuelle."""
+    if user is None or not getattr(user, "is_authenticated", False):
+        return False
+    if user.is_superuser:
+        return True
+    return MutuelleMembership.objects.filter(
+        mutuelle=mutuelle, user=user, active=True
+    ).exists()
 
 
 def _active_mutuelle(request):
@@ -274,65 +306,94 @@ def _mutuelle_context(mutuelle):
     return context
 
 
-def _global_context():
-    mutuelles = Mutuelle.objects.all().order_by("name")
-    active_mutuelle = Mutuelle.objects.filter(status=Mutuelle.Status.ACTIVE).order_by("created_at").first()
-    members_count = Member.all_objects.count()
-    active_members_count = Member.all_objects.filter(status=Member.Status.ACTIVE).count()
-    programs_count = RealEstateProgram.all_objects.count()
-    financing_total = CashAccount.all_objects.filter(active=True).aggregate(total=Sum("balance"))["total"] or 0
+def _global_context(request=None):
+    """Construit le contexte global du dashboard.
+
+    Filtré sur les mutuelles accessibles à l'utilisateur courant :
+    - superuser → toutes mutuelles ;
+    - mutuelle admin → uniquement ses mutuelles via MutuelleMembership ;
+    - anonyme (landing) → toutes mutuelles ACTIVE (pour les chiffres marketing).
+    """
+    user = getattr(request, "user", None) if request else None
+
+    if user is not None and user.is_authenticated:
+        accessible = _user_accessible_mutuelles(user)
+    else:
+        # Sur la landing publique, on agrège les chiffres globaux marketing
+        accessible = Mutuelle.objects.filter(status=Mutuelle.Status.ACTIVE)
+
+    mutuelle_ids = list(accessible.values_list("id", flat=True))
+    mutuelles = accessible.order_by("name")
+    active_mutuelle = accessible.filter(status=Mutuelle.Status.ACTIVE).order_by("created_at").first()
+
+    # Sécurité : on filtre TOUTES les agrégations sur mutuelle_ids
+    members_count = Member.all_objects.filter(mutuelle_id__in=mutuelle_ids).count()
+    active_members_count = Member.all_objects.filter(mutuelle_id__in=mutuelle_ids, status=Member.Status.ACTIVE).count()
+    programs_count = RealEstateProgram.all_objects.filter(mutuelle_id__in=mutuelle_ids).count()
+    financing_total = CashAccount.all_objects.filter(mutuelle_id__in=mutuelle_ids, active=True).aggregate(total=Sum("balance"))["total"] or 0
     paid_contributions_total = (
-        Contribution.all_objects.filter(status=Contribution.Status.PAID).aggregate(total=Sum("amount"))["total"] or 0
+        Contribution.all_objects.filter(mutuelle_id__in=mutuelle_ids, status=Contribution.Status.PAID).aggregate(total=Sum("amount"))["total"] or 0
     )
     due_contributions_count = Contribution.all_objects.filter(
-        status__in=[Contribution.Status.DUE, Contribution.Status.PARTIAL, Contribution.Status.OVERDUE]
+        mutuelle_id__in=mutuelle_ids,
+        status__in=[Contribution.Status.DUE, Contribution.Status.PARTIAL, Contribution.Status.OVERDUE],
     ).count()
-    overdue_contributions_count = Contribution.all_objects.filter(status=Contribution.Status.OVERDUE).count()
-    mobile_money_success_count = Payment.all_objects.filter(status=Payment.Status.SUCCESS).count()
+    overdue_contributions_count = Contribution.all_objects.filter(mutuelle_id__in=mutuelle_ids, status=Contribution.Status.OVERDUE).count()
+    mobile_money_success_count = Payment.all_objects.filter(mutuelle_id__in=mutuelle_ids, status=Payment.Status.SUCCESS).count()
     mobile_money_pending_count = Payment.all_objects.filter(
-        status__in=[Payment.Status.INITIATED, Payment.Status.PENDING]
+        mutuelle_id__in=mutuelle_ids,
+        status__in=[Payment.Status.INITIATED, Payment.Status.PENDING],
     ).count()
-    mobile_money_total = Payment.all_objects.filter(status=Payment.Status.SUCCESS).aggregate(total=Sum("amount"))["total"] or 0
-    claims_open_count = AssistanceClaim.all_objects.exclude(
+    mobile_money_total = Payment.all_objects.filter(mutuelle_id__in=mutuelle_ids, status=Payment.Status.SUCCESS).aggregate(total=Sum("amount"))["total"] or 0
+    claims_open_count = AssistanceClaim.all_objects.filter(mutuelle_id__in=mutuelle_ids).exclude(
         status__in=[AssistanceClaim.Status.CLOSED, AssistanceClaim.Status.REJECTED]
     ).count()
     claims_review_count = AssistanceClaim.all_objects.filter(
-        status__in=[AssistanceClaim.Status.SUBMITTED, AssistanceClaim.Status.REVIEW]
+        mutuelle_id__in=mutuelle_ids,
+        status__in=[AssistanceClaim.Status.SUBMITTED, AssistanceClaim.Status.REVIEW],
     ).count()
     claims_paid_total = (
-        AssistanceClaim.all_objects.filter(status__in=[AssistanceClaim.Status.PAID, AssistanceClaim.Status.CLOSED]).aggregate(
-            total=Sum("approved_amount")
-        )["total"]
+        AssistanceClaim.all_objects.filter(
+            mutuelle_id__in=mutuelle_ids,
+            status__in=[AssistanceClaim.Status.PAID, AssistanceClaim.Status.CLOSED],
+        ).aggregate(total=Sum("approved_amount"))["total"]
         or 0
     )
-    documents_verified_count = PropertyDocument.all_objects.filter(verified=True).count()
-    documents_pending_count = PropertyDocument.all_objects.filter(verified=False).count()
+    documents_verified_count = PropertyDocument.all_objects.filter(mutuelle_id__in=mutuelle_ids, verified=True).count()
+    documents_pending_count = PropertyDocument.all_objects.filter(mutuelle_id__in=mutuelle_ids, verified=False).count()
     documents_total = documents_verified_count + documents_pending_count
     ocr_confidence_avg = int((documents_verified_count / documents_total) * 100) if documents_total else 0
     simulations_eligible_count = QuotiteCessibleSimulation.all_objects.filter(
-        decision=QuotiteCessibleSimulation.Decision.ELIGIBLE
+        mutuelle_id__in=mutuelle_ids, decision=QuotiteCessibleSimulation.Decision.ELIGIBLE
     ).count()
     simulations_conditional_count = QuotiteCessibleSimulation.all_objects.filter(
-        decision=QuotiteCessibleSimulation.Decision.CONDITIONAL
+        mutuelle_id__in=mutuelle_ids, decision=QuotiteCessibleSimulation.Decision.CONDITIONAL
     ).count()
     simulations_rejected_count = QuotiteCessibleSimulation.all_objects.filter(
-        decision=QuotiteCessibleSimulation.Decision.REJECTED
+        mutuelle_id__in=mutuelle_ids, decision=QuotiteCessibleSimulation.Decision.REJECTED
     ).count()
-    reservations_count = PropertyReservation.all_objects.count()
+    reservations_count = PropertyReservation.all_objects.filter(mutuelle_id__in=mutuelle_ids).count()
     approved_reservations_count = PropertyReservation.all_objects.filter(
-        status__in=[PropertyReservation.Status.APPROVED, PropertyReservation.Status.CONVERTED]
+        mutuelle_id__in=mutuelle_ids,
+        status__in=[PropertyReservation.Status.APPROVED, PropertyReservation.Status.CONVERTED],
     ).count()
-    available_lots_count = PropertyLot.all_objects.filter(status=PropertyLot.Status.AVAILABLE).count()
-    financing_scenarios_count = FinancingScenario.all_objects.count()
-    mortgage_applications_count = MortgageApplication.all_objects.count()
+    available_lots_count = PropertyLot.all_objects.filter(mutuelle_id__in=mutuelle_ids, status=PropertyLot.Status.AVAILABLE).count()
+    financing_scenarios_count = FinancingScenario.all_objects.filter(mutuelle_id__in=mutuelle_ids).count()
+    mortgage_applications_count = MortgageApplication.all_objects.filter(mutuelle_id__in=mutuelle_ids).count()
     mortgage_approved_count = MortgageApplication.all_objects.filter(
-        status__in=[MortgageApplication.Status.APPROVED, MortgageApplication.Status.DISBURSED, MortgageApplication.Status.CLOSED]
+        mutuelle_id__in=mutuelle_ids,
+        status__in=[MortgageApplication.Status.APPROVED, MortgageApplication.Status.DISBURSED, MortgageApplication.Status.CLOSED],
     ).count()
-    mortgage_disbursed_total = MortgageApplication.all_objects.aggregate(total=Sum("disbursed_amount"))["total"] or 0
-    security_failed_logins = LoginEvent.objects.filter(status=LoginEvent.Status.FAILED).count()
-    security_success_logins = LoginEvent.objects.filter(status=LoginEvent.Status.SUCCESS).count()
-    ai_analyses_count = AIAnalysis.all_objects.count()
-    notifications_queued_count = Notification.all_objects.filter(status=Notification.Status.QUEUED).count()
+    mortgage_disbursed_total = MortgageApplication.all_objects.filter(mutuelle_id__in=mutuelle_ids).aggregate(total=Sum("disbursed_amount"))["total"] or 0
+    # Audits sécurité réservés au superuser
+    if user is not None and user.is_superuser:
+        security_failed_logins = LoginEvent.objects.filter(status=LoginEvent.Status.FAILED).count()
+        security_success_logins = LoginEvent.objects.filter(status=LoginEvent.Status.SUCCESS).count()
+    else:
+        security_failed_logins = 0
+        security_success_logins = 0
+    ai_analyses_count = AIAnalysis.all_objects.filter(mutuelle_id__in=mutuelle_ids).count()
+    notifications_queued_count = Notification.all_objects.filter(mutuelle_id__in=mutuelle_ids, status=Notification.Status.QUEUED).count()
     rows = []
     for mutuelle in mutuelles:
         score = compute_mutuelle_score(mutuelle)
@@ -459,7 +520,7 @@ def _global_context():
 
 
 def landing_page(request):
-    context = _global_context()
+    context = _global_context(request)
     return render(request, "dashboard/landing.html", context)
 
 
@@ -702,7 +763,7 @@ def submit_contact_request(request):
 
 @login_required
 def console_dashboard(request):
-    context = _global_context()
+    context = _global_context(request)
     context.update(_mutuelle_context(_active_mutuelle(request)))
     context["active_tab"] = "dashboard"
     return render(request, "dashboard/console.html", context)
@@ -710,8 +771,10 @@ def console_dashboard(request):
 
 @login_required
 def mutuelles_list(request):
-    context = _global_context()
+    """Liste des mutuelles accessibles à l'utilisateur (isolation tenant)."""
+    context = _global_context(request)
     context["active_tab"] = "mutuelles"
+    context["mutuelles"] = _user_accessible_mutuelles(request.user).order_by("name")
     return render(request, "dashboard/mutuelles_list.html", context)
 
 
@@ -784,6 +847,8 @@ def mutuelle_detail(request, mutuelle_id):
     - Documents
     """
     mutuelle = get_object_or_404(Mutuelle, id=mutuelle_id)
+    if not _user_can_access_mutuelle(request.user, mutuelle):
+        raise Http404("Mutuelle introuvable ou accès refusé.")
     context = _mutuelle_context(mutuelle)
     context["active_tab"] = "mutuelles"
 
@@ -876,27 +941,30 @@ def mutuelle_detail(request, mutuelle_id):
 
 @login_required
 def projects_center(request):
-    context = _global_context()
+    context = _global_context(request)
     context["active_tab"] = "projects"
-    context["programs"] = RealEstateProgram.all_objects.select_related("mutuelle").order_by("-created_at")[:20]
-    context["opportunities"] = RealEstateOpportunity.all_objects.select_related("mutuelle", "program").order_by("-score", "-created_at")[:20]
+    scope = _user_accessible_mutuelles(request.user)
+    context["programs"] = RealEstateProgram.all_objects.filter(mutuelle__in=scope).select_related("mutuelle").order_by("-created_at")[:20]
+    context["opportunities"] = RealEstateOpportunity.all_objects.filter(mutuelle__in=scope).select_related("mutuelle", "program").order_by("-score", "-created_at")[:20]
     return render(request, "dashboard/projects.html", context)
 
 
 @login_required
 def members_center(request):
-    context = _global_context()
+    context = _global_context(request)
     context["active_tab"] = "members"
-    context["members"] = Member.all_objects.select_related("mutuelle").order_by("-created_at")[:30]
-    context["simulations"] = QuotiteCessibleSimulation.all_objects.select_related("member", "mutuelle").order_by("-created_at")[:8]
+    scope = _user_accessible_mutuelles(request.user)
+    context["members"] = Member.all_objects.filter(mutuelle__in=scope).select_related("mutuelle").order_by("-created_at")[:30]
+    context["simulations"] = QuotiteCessibleSimulation.all_objects.filter(mutuelle__in=scope).select_related("member", "mutuelle").order_by("-created_at")[:8]
     return render(request, "dashboard/members.html", context)
 
 
 @login_required
 def simulations_center(request):
-    context = _global_context()
+    context = _global_context(request)
     context["active_tab"] = "simulations"
-    simulations_qs = QuotiteCessibleSimulation.all_objects.select_related("member", "mutuelle")
+    scope = _user_accessible_mutuelles(request.user)
+    simulations_qs = QuotiteCessibleSimulation.all_objects.filter(mutuelle__in=scope).select_related("member", "mutuelle")
     context["simulations"] = simulations_qs.order_by("-created_at")[:30]
     context["eligible_count"] = simulations_qs.filter(decision=QuotiteCessibleSimulation.Decision.ELIGIBLE).count()
     context["conditional_count"] = simulations_qs.filter(decision=QuotiteCessibleSimulation.Decision.CONDITIONAL).count()
@@ -916,6 +984,8 @@ def simulation_detail(request, simulation_id):
     )
     member = simulation.member
     mutuelle = simulation.mutuelle
+    if not _user_can_access_mutuelle(request.user, mutuelle):
+        raise Http404("Simulation introuvable ou accès refusé.")
 
     # Comparaison avec les autres simulations du même membre
     other_simulations = (
@@ -924,7 +994,7 @@ def simulation_detail(request, simulation_id):
         .order_by("-created_at")[:5]
     )
 
-    context = _global_context()
+    context = _global_context(request)
     context.update(
         {
             "simulation": simulation,
@@ -941,82 +1011,106 @@ def simulation_detail(request, simulation_id):
 
 @login_required
 def documents_center(request):
-    context = _global_context()
+    context = _global_context(request)
     context["active_tab"] = "documents"
-    context["documents"] = PropertyDocument.all_objects.select_related("mutuelle", "program").order_by("-created_at")[:20]
-    context["verified_documents"] = PropertyDocument.all_objects.filter(verified=True).count()
-    context["pending_documents"] = PropertyDocument.all_objects.filter(ocr_payload__status="queued").count()
-    context["review_documents"] = PropertyDocument.all_objects.filter(ocr_payload__decision="review_required").count()
+    scope = _user_accessible_mutuelles(request.user)
+    docs_scoped = PropertyDocument.all_objects.filter(mutuelle__in=scope)
+    context["documents"] = docs_scoped.select_related("mutuelle", "program").order_by("-created_at")[:20]
+    context["verified_documents"] = docs_scoped.filter(verified=True).count()
+    context["pending_documents"] = docs_scoped.filter(ocr_payload__status="queued").count()
+    context["review_documents"] = docs_scoped.filter(ocr_payload__decision="review_required").count()
     return render(request, "dashboard/documents.html", context)
 
 
 @login_required
 def reports_center(request):
-    context = _global_context()
+    context = _global_context(request)
     context["active_tab"] = "reports"
     return render(request, "dashboard/reports.html", context)
 
 
 @login_required
 def notifications_center(request):
-    context = _global_context()
+    context = _global_context(request)
     context["active_tab"] = "notifications"
-    context["notifications"] = Notification.all_objects.select_related("mutuelle", "member", "recipient_user").order_by("-created_at")[:40]
-    context["queued_count"] = Notification.all_objects.filter(status=Notification.Status.QUEUED).count()
-    context["sent_count"] = Notification.all_objects.filter(status=Notification.Status.SENT).count()
-    context["failed_count"] = Notification.all_objects.filter(status=Notification.Status.FAILED).count()
+    scope = _user_accessible_mutuelles(request.user)
+    notifs_scoped = Notification.all_objects.filter(mutuelle__in=scope)
+    context["notifications"] = notifs_scoped.select_related("mutuelle", "member", "recipient_user").order_by("-created_at")[:40]
+    context["queued_count"] = notifs_scoped.filter(status=Notification.Status.QUEUED).count()
+    context["sent_count"] = notifs_scoped.filter(status=Notification.Status.SENT).count()
+    context["failed_count"] = notifs_scoped.filter(status=Notification.Status.FAILED).count()
     return render(request, "dashboard/notifications.html", context)
 
 
 @login_required
 def field_offline_center(request):
-    context = _global_context()
+    context = _global_context(request)
     context["active_tab"] = "offline"
-    context["field_members"] = Member.all_objects.select_related("mutuelle").order_by("-created_at")[:12]
-    context["field_payments"] = Payment.all_objects.select_related("mutuelle", "member").order_by("-created_at")[:12]
+    scope = _user_accessible_mutuelles(request.user)
+    context["field_members"] = Member.all_objects.filter(mutuelle__in=scope).select_related("mutuelle").order_by("-created_at")[:12]
+    context["field_payments"] = Payment.all_objects.filter(mutuelle__in=scope).select_related("mutuelle", "member").order_by("-created_at")[:12]
     return render(request, "dashboard/offline.html", context)
 
 
 @login_required
 def ai_copilot_center(request):
-    context = _global_context()
+    context = _global_context(request)
     context["active_tab"] = "ai"
-    context["analyses"] = AIAnalysis.all_objects.select_related("mutuelle").order_by("-created_at")[:20]
-    context["decision_notes"] = AIAnalysis.all_objects.filter(analysis_type="mutuelle_decision_note").count()
-    context["fraud_notes"] = AIAnalysis.all_objects.filter(analysis_type="fraud_risk").count()
-    context["ocr_notes"] = AIAnalysis.all_objects.filter(analysis_type="ocr_document").count()
+    scope = _user_accessible_mutuelles(request.user)
+    ai_scoped = AIAnalysis.all_objects.filter(mutuelle__in=scope)
+    context["analyses"] = ai_scoped.select_related("mutuelle").order_by("-created_at")[:20]
+    context["decision_notes"] = ai_scoped.filter(analysis_type="mutuelle_decision_note").count()
+    context["fraud_notes"] = ai_scoped.filter(analysis_type="fraud_risk").count()
+    context["ocr_notes"] = ai_scoped.filter(analysis_type="ocr_document").count()
     return render(request, "dashboard/ai_copilot.html", context)
 
 
 @login_required
 def governance_center(request):
-    context = _global_context()
+    context = _global_context(request)
     context["active_tab"] = "governance"
-    context["assemblies"] = GeneralAssembly.all_objects.select_related("mutuelle").order_by("-scheduled_at")[:20]
-    context["resolutions"] = Resolution.all_objects.select_related("mutuelle", "assembly").order_by("-created_at")[:20]
-    context["open_resolutions"] = Resolution.all_objects.filter(status=Resolution.Status.OPEN).count()
-    context["votes_count"] = ResolutionVote.all_objects.count()
-    context["closed_assemblies"] = GeneralAssembly.all_objects.filter(status=GeneralAssembly.Status.CLOSED).count()
+    scope = _user_accessible_mutuelles(request.user)
+    assemblies_scoped = GeneralAssembly.all_objects.filter(mutuelle__in=scope)
+    resolutions_scoped = Resolution.all_objects.filter(mutuelle__in=scope)
+    context["assemblies"] = assemblies_scoped.select_related("mutuelle").order_by("-scheduled_at")[:20]
+    context["resolutions"] = resolutions_scoped.select_related("mutuelle", "assembly").order_by("-created_at")[:20]
+    context["open_resolutions"] = resolutions_scoped.filter(status=Resolution.Status.OPEN).count()
+    context["votes_count"] = ResolutionVote.all_objects.filter(mutuelle__in=scope).count()
+    context["closed_assemblies"] = assemblies_scoped.filter(status=GeneralAssembly.Status.CLOSED).count()
     return render(request, "dashboard/governance.html", context)
 
 
 @login_required
 def branding_center(request):
-    context = _global_context()
+    context = _global_context(request)
     context["active_tab"] = "branding"
     return render(request, "dashboard/branding.html", context)
 
 
 @login_required
 def security_center(request):
-    context = _global_context()
+    """Centre sécurité.
+
+    - SuperAdmin → vue globale (tous logins, tous devices, tous OTP).
+    - Mutuelle admin → uniquement ses propres devices/logins/OTP.
+    """
+    context = _global_context(request)
     context["active_tab"] = "security"
-    context["login_events"] = LoginEvent.objects.select_related("user").order_by("-created_at")[:40]
-    context["devices"] = UserDevice.objects.select_related("user").order_by("-last_seen_at")[:30]
-    context["otp_challenges"] = OTPChallenge.objects.select_related("user").order_by("-created_at")[:20]
-    context["success_logins"] = LoginEvent.objects.filter(status=LoginEvent.Status.SUCCESS).count()
-    context["failed_logins"] = LoginEvent.objects.filter(status=LoginEvent.Status.FAILED).count()
-    context["mfa_users"] = LoginEvent.objects.filter(user__mfa_enabled=True).values("user").distinct().count()
+    if request.user.is_superuser:
+        context["login_events"] = LoginEvent.objects.select_related("user").order_by("-created_at")[:40]
+        context["devices"] = UserDevice.objects.select_related("user").order_by("-last_seen_at")[:30]
+        context["otp_challenges"] = OTPChallenge.objects.select_related("user").order_by("-created_at")[:20]
+        context["success_logins"] = LoginEvent.objects.filter(status=LoginEvent.Status.SUCCESS).count()
+        context["failed_logins"] = LoginEvent.objects.filter(status=LoginEvent.Status.FAILED).count()
+        context["mfa_users"] = LoginEvent.objects.filter(user__mfa_enabled=True).values("user").distinct().count()
+    else:
+        u = request.user
+        context["login_events"] = LoginEvent.objects.filter(user=u).select_related("user").order_by("-created_at")[:40]
+        context["devices"] = UserDevice.objects.filter(user=u).order_by("-last_seen_at")[:30]
+        context["otp_challenges"] = OTPChallenge.objects.filter(user=u).order_by("-created_at")[:20]
+        context["success_logins"] = LoginEvent.objects.filter(user=u, status=LoginEvent.Status.SUCCESS).count()
+        context["failed_logins"] = LoginEvent.objects.filter(user=u, status=LoginEvent.Status.FAILED).count()
+        context["mfa_users"] = 1 if u.mfa_enabled else 0
     return render(request, "dashboard/security.html", context)
 
 
@@ -1040,7 +1134,7 @@ def profile_center(request):
             update_session_auth_hash(request, user)
             password_saved = True
 
-    context = _global_context()
+    context = _global_context(request)
     context.update(
         {
             "active_tab": "profile",
@@ -1057,44 +1151,52 @@ def profile_center(request):
 
 @login_required
 def finance_center(request):
-    context = _global_context()
+    context = _global_context(request)
     context["active_tab"] = "finance"
-    context["contributions"] = Contribution.all_objects.select_related("member", "mutuelle", "plan").order_by("-created_at")[:30]
-    context["plans"] = ContributionPlan.all_objects.select_related("mutuelle").order_by("-created_at")[:12]
-    context["payments"] = Payment.all_objects.select_related("member", "mutuelle").order_by("-created_at")[:20]
-    context["cash_accounts"] = CashAccount.all_objects.select_related("mutuelle").order_by("mutuelle__name", "name")[:20]
-    context["paid_contributions"] = Contribution.all_objects.filter(status=Contribution.Status.PAID).count()
-    context["pending_payments"] = Payment.all_objects.filter(status=Payment.Status.PENDING).count()
+    scope = _user_accessible_mutuelles(request.user)
+    contribs_scoped = Contribution.all_objects.filter(mutuelle__in=scope)
+    payments_scoped = Payment.all_objects.filter(mutuelle__in=scope)
+    context["contributions"] = contribs_scoped.select_related("member", "mutuelle", "plan").order_by("-created_at")[:30]
+    context["plans"] = ContributionPlan.all_objects.filter(mutuelle__in=scope).select_related("mutuelle").order_by("-created_at")[:12]
+    context["payments"] = payments_scoped.select_related("member", "mutuelle").order_by("-created_at")[:20]
+    context["cash_accounts"] = CashAccount.all_objects.filter(mutuelle__in=scope).select_related("mutuelle").order_by("mutuelle__name", "name")[:20]
+    context["paid_contributions"] = contribs_scoped.filter(status=Contribution.Status.PAID).count()
+    context["pending_payments"] = payments_scoped.filter(status=Payment.Status.PENDING).count()
     return render(request, "dashboard/finance.html", context)
 
 
 @login_required
 def financing_center(request):
-    context = _global_context()
+    context = _global_context(request)
     context["active_tab"] = "financing"
-    context["scenarios"] = FinancingScenario.all_objects.select_related("mutuelle", "member", "opportunity", "opportunity__program").order_by("-created_at")[:30]
-    context["applications"] = MortgageApplication.all_objects.select_related("mutuelle", "member", "scenario", "scenario__opportunity").order_by("-created_at")[:30]
-    context["committee_count"] = MortgageApplication.all_objects.filter(status=MortgageApplication.Status.COMMITTEE).count()
-    context["bank_review_count"] = MortgageApplication.all_objects.filter(status=MortgageApplication.Status.BANK_REVIEW).count()
-    context["approved_count"] = MortgageApplication.all_objects.filter(status=MortgageApplication.Status.APPROVED).count()
-    context["disbursed_total"] = MortgageApplication.all_objects.aggregate(total=Sum("disbursed_amount"))["total"] or 0
+    scope = _user_accessible_mutuelles(request.user)
+    scenarios_scoped = FinancingScenario.all_objects.filter(mutuelle__in=scope)
+    apps_scoped = MortgageApplication.all_objects.filter(mutuelle__in=scope)
+    context["scenarios"] = scenarios_scoped.select_related("mutuelle", "member", "opportunity", "opportunity__program").order_by("-created_at")[:30]
+    context["applications"] = apps_scoped.select_related("mutuelle", "member", "scenario", "scenario__opportunity").order_by("-created_at")[:30]
+    context["committee_count"] = apps_scoped.filter(status=MortgageApplication.Status.COMMITTEE).count()
+    context["bank_review_count"] = apps_scoped.filter(status=MortgageApplication.Status.BANK_REVIEW).count()
+    context["approved_count"] = apps_scoped.filter(status=MortgageApplication.Status.APPROVED).count()
+    context["disbursed_total"] = apps_scoped.aggregate(total=Sum("disbursed_amount"))["total"] or 0
     return render(request, "dashboard/financing.html", context)
 
 
 @login_required
 def claims_center(request):
-    context = _global_context()
+    context = _global_context(request)
     context["active_tab"] = "claims"
-    context["claims"] = AssistanceClaim.all_objects.select_related("mutuelle", "member").order_by("-created_at")[:40]
-    context["submitted_count"] = AssistanceClaim.all_objects.filter(status=AssistanceClaim.Status.SUBMITTED).count()
-    context["review_count"] = AssistanceClaim.all_objects.filter(status=AssistanceClaim.Status.REVIEW).count()
-    context["approved_count"] = AssistanceClaim.all_objects.filter(status=AssistanceClaim.Status.APPROVED).count()
-    context["paid_total"] = AssistanceClaim.all_objects.filter(status__in=[AssistanceClaim.Status.PAID, AssistanceClaim.Status.CLOSED]).aggregate(total=Sum("approved_amount"))["total"] or 0
+    scope = _user_accessible_mutuelles(request.user)
+    claims_scoped = AssistanceClaim.all_objects.filter(mutuelle__in=scope)
+    context["claims"] = claims_scoped.select_related("mutuelle", "member").order_by("-created_at")[:40]
+    context["submitted_count"] = claims_scoped.filter(status=AssistanceClaim.Status.SUBMITTED).count()
+    context["review_count"] = claims_scoped.filter(status=AssistanceClaim.Status.REVIEW).count()
+    context["approved_count"] = claims_scoped.filter(status=AssistanceClaim.Status.APPROVED).count()
+    context["paid_total"] = claims_scoped.filter(status__in=[AssistanceClaim.Status.PAID, AssistanceClaim.Status.CLOSED]).aggregate(total=Sum("approved_amount"))["total"] or 0
     return render(request, "dashboard/claims.html", context)
 
 
 def _render_form(request, form, title, subtitle, submit_label, back_url):
-    context = _global_context()
+    context = _global_context(request)
     context.update(
         {
             "form": form,
@@ -1138,7 +1240,7 @@ def create_mutuelle(request):
             request.user.save(update_fields=["default_mutuelle"])
         return redirect("mutuelle-detail", mutuelle_id=mutuelle.id)
 
-    context = _global_context()
+    context = _global_context(request)
     context.update(
         {
             "form": form,
@@ -1175,6 +1277,8 @@ def member_detail(request, member_id):
         id=member_id,
     )
     mutuelle = member.mutuelle
+    if not _user_can_access_mutuelle(request.user, mutuelle):
+        raise Http404("Membre introuvable ou accès refusé.")
 
     # Profil financier (peut ne pas exister)
     fin_profile = getattr(member, "financial_profile", None)
@@ -1217,7 +1321,7 @@ def member_detail(request, member_id):
     # KPI rapides du membre
     paid_total = sum((c.amount for c in contributions if c.status == Contribution.Status.PAID), 0)
 
-    context = _global_context()
+    context = _global_context(request)
     context.update(
         {
             "member": member,
@@ -1263,7 +1367,7 @@ def create_member(request):
         form.save()
         return redirect("create-financial-profile")
 
-    context = _global_context()
+    context = _global_context(request)
     context.update(
         {
             "form": form,
@@ -1318,7 +1422,7 @@ def import_members(request):
                 f"{report.error_count} ligne(s) en erreur — voir le détail ci-dessous.",
             )
 
-    context = _global_context()
+    context = _global_context(request)
     context.update(
         {
             "form": form,
@@ -1377,7 +1481,7 @@ def send_member_invitations(request):
         .order_by("-created_at")[:30]
     )
 
-    context = _global_context()
+    context = _global_context(request)
     context.update(
         {
             "form": form,
@@ -1493,7 +1597,7 @@ def create_financial_profile(request):
         form.save()
         return redirect("simulations-center")
 
-    context = _global_context()
+    context = _global_context(request)
     context.update(
         {
             "form": form,
@@ -1614,7 +1718,7 @@ def create_simulation(request):
         )
         return redirect("member-detail", member_id=member.id)
 
-    context = _global_context()
+    context = _global_context(request)
     context.update(
         {
             "form": form,
