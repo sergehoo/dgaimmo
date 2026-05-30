@@ -229,6 +229,234 @@
                 </div>
             </section>
 
+
+            <section id="simulateurs" class="bg-gradient-to-br from-[#f7faff] via-white to-[#eef4ff] py-20"
+                     x-data="publicSimulator()">
+              <div class="mx-auto max-w-[1320px] px-5 lg:px-8">
+                <div class="mb-10 max-w-3xl">
+                  <p class="inline-flex rounded-full border border-[#dce8f8] bg-white px-4 py-2 text-xs font-black uppercase tracking-[.16em] text-[#0b55d9] shadow-sm"><i class="fa-solid fa-calculator"></i> Simulateurs gratuits</p>
+                  <h2 class="mt-5 text-3xl font-black leading-tight md:text-4xl">Testez votre capacité d'emprunt en quelques clics.</h2>
+                  <p class="mt-4 text-base font-semibold leading-7 text-[#536484]">Aucune inscription requise. Les résultats s'affichent instantanément à partir des informations que vous saisissez.</p>
+                </div>
+
+                {# --- Onglets simulateurs --- #}
+                <div class="flex flex-wrap gap-2 rounded-2xl border border-[#e5edf8] bg-white p-2 shadow-sm">
+                  <button type="button" @click="tab='credit'"
+                          :class="tab==='credit' ? 'bg-[#0b55d9] text-white shadow-md' : 'bg-transparent text-[#06194a] hover:bg-[#f3f7ff]'"
+                          class="flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-black transition">
+                    <i class="fa-solid fa-house-chimney-window"></i> Simulation de crédit immobilier
+                  </button>
+                  <button type="button" @click="tab='quotite'"
+                          :class="tab==='quotite' ? 'bg-[#0b55d9] text-white shadow-md' : 'bg-transparent text-[#06194a] hover:bg-[#f3f7ff]'"
+                          class="flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-black transition">
+                    <i class="fa-solid fa-scale-balanced"></i> Quotité cessible
+                  </button>
+                </div>
+
+                {# ===== ONGLET CRÉDIT ===== #}
+                <div x-show="tab==='credit'" x-transition.opacity class="mt-6 grid gap-6 xl:grid-cols-[1fr_1fr]">
+                  <div class="rounded-[28px] border border-[#e5edf8] bg-white p-7 shadow-sm">
+                    <h3 class="text-xl font-black"><i class="fa-solid fa-sliders text-[#0b55d9]"></i> Paramètres du crédit</h3>
+                    <form @submit.prevent="runCredit()" class="mt-5 grid gap-5">
+                      <div>
+                        <label class="mb-1 block text-xs font-black uppercase text-[#536484]">Montant emprunté (FCFA)</label>
+                        <input type="number" min="100000" step="100000" x-model.number="credit.amount"
+                               class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#0b55d9]"
+                               placeholder="Ex. 25 000 000">
+                      </div>
+                      <div class="grid gap-4 sm:grid-cols-2">
+                        <div>
+                          <label class="mb-1 block text-xs font-black uppercase text-[#536484]">Taux annuel (%)</label>
+                          <input type="number" min="0" max="50" step="0.1" x-model.number="credit.rate"
+                                 class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#0b55d9]">
+                        </div>
+                        <div>
+                          <label class="mb-1 block text-xs font-black uppercase text-[#536484]">Durée (mois)</label>
+                          <input type="number" min="1" max="480" step="1" x-model.number="credit.months"
+                                 class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#0b55d9]">
+                        </div>
+                      </div>
+                      <div class="flex flex-wrap gap-3">
+                        <button type="submit" :disabled="credit.loading"
+                                class="rounded-2xl bg-[#0b55d9] px-6 py-3 text-sm font-black text-white shadow-lg shadow-blue-900/20 disabled:opacity-60">
+                          <i class="fa-solid" :class="credit.loading ? 'fa-spinner fa-spin' : 'fa-calculator'"></i>
+                          <span x-text="credit.loading ? 'Calcul…' : 'Calculer'"></span>
+                        </button>
+                        <button type="button" @click="resetCredit()" class="rounded-2xl border border-[#dce7f6] bg-white px-6 py-3 text-sm font-black text-[#06194a]">Réinitialiser</button>
+                      </div>
+                      <p x-show="credit.error" x-cloak class="rounded-xl bg-red-50 p-3 text-xs font-bold text-red-700" x-text="credit.error"></p>
+                    </form>
+                  </div>
+
+                  {# Résultats crédit #}
+                  <div class="rounded-[28px] bg-gradient-to-br from-[#06194a] to-[#003b98] p-7 text-white shadow-2xl shadow-blue-950/20">
+                    <h3 class="text-xl font-black"><i class="fa-solid fa-chart-line text-[#caff3d]"></i> Résultat</h3>
+                    <template x-if="credit.result">
+                      <div class="mt-5 grid gap-4">
+                        <div class="rounded-2xl bg-white/10 p-5">
+                          <span class="text-xs font-black uppercase text-white/70">Mensualité</span>
+                          <b class="mt-1 block text-3xl font-black text-[#caff3d]" x-text="fmt(credit.result.monthly_payment) + ' FCFA'"></b>
+                        </div>
+                        <div class="grid gap-3 sm:grid-cols-2">
+                          <div class="rounded-2xl bg-white/10 p-4">
+                            <span class="text-xs font-black uppercase text-white/70">Coût total</span>
+                            <b class="mt-1 block text-xl" x-text="fmt(credit.result.total_cost) + ' FCFA'"></b>
+                          </div>
+                          <div class="rounded-2xl bg-white/10 p-4">
+                            <span class="text-xs font-black uppercase text-white/70">Intérêts payés</span>
+                            <b class="mt-1 block text-xl text-[#cfff3d]" x-text="fmt(credit.result.total_interest) + ' FCFA'"></b>
+                          </div>
+                        </div>
+                        <p class="mt-1 text-xs font-bold text-white/60">
+                          Sur <span x-text="credit.result.months"></span> mois (<span x-text="credit.result.years"></span> ans)
+                          au taux annuel de <span x-text="credit.result.rate"></span>%.
+                        </p>
+                      </div>
+                    </template>
+                    <template x-if="!credit.result">
+                      <p class="mt-5 rounded-2xl bg-white/10 p-6 text-center text-sm font-bold text-white/70">
+                        <i class="fa-solid fa-arrow-left"></i> Remplissez les paramètres et cliquez sur Calculer.
+                      </p>
+                    </template>
+                  </div>
+                </div>
+
+                {# ===== ONGLET QUOTITÉ ===== #}
+                <div x-show="tab==='quotite'" x-transition.opacity class="mt-6 grid gap-6 xl:grid-cols-[1fr_1fr]">
+                  <div class="rounded-[28px] border border-[#e5edf8] bg-white p-7 shadow-sm">
+                    <h3 class="text-xl font-black"><i class="fa-solid fa-scale-balanced text-[#7c3aed]"></i> Votre situation financière</h3>
+                    <form @submit.prevent="runQuotite()" class="mt-5 grid gap-4">
+                      <div class="grid gap-4 sm:grid-cols-2">
+                        <div>
+                          <label class="mb-1 block text-xs font-black uppercase text-[#536484]">Revenu net mensuel (FCFA)</label>
+                          <input type="number" min="0" step="10000" x-model.number="quotite.net_salary"
+                                 class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#7c3aed]">
+                        </div>
+                        <div>
+                          <label class="mb-1 block text-xs font-black uppercase text-[#536484]">Revenus complémentaires</label>
+                          <input type="number" min="0" step="10000" x-model.number="quotite.complementary_income"
+                                 class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#7c3aed]">
+                        </div>
+                        <div>
+                          <label class="mb-1 block text-xs font-black uppercase text-[#536484]">Charges fixes mensuelles</label>
+                          <input type="number" min="0" step="10000" x-model.number="quotite.fixed_charges"
+                                 class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#7c3aed]">
+                        </div>
+                        <div>
+                          <label class="mb-1 block text-xs font-black uppercase text-[#536484]">Prêts en cours (mensualité)</label>
+                          <input type="number" min="0" step="5000" x-model.number="quotite.existing_loans"
+                                 class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#7c3aed]">
+                        </div>
+                      </div>
+
+                      <div class="grid gap-4 sm:grid-cols-3">
+                        <div>
+                          <label class="mb-1 block text-xs font-black uppercase text-[#536484]">Taux endettement max (%)</label>
+                          <input type="number" min="1" max="100" step="1" x-model.number="quotite.max_debt_ratio"
+                                 class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#7c3aed]">
+                        </div>
+                        <div>
+                          <label class="mb-1 block text-xs font-black uppercase text-[#536484]">Taux annuel (%)</label>
+                          <input type="number" min="0" max="50" step="0.1" x-model.number="quotite.annual_rate"
+                                 class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#7c3aed]">
+                        </div>
+                        <div>
+                          <label class="mb-1 block text-xs font-black uppercase text-[#536484]">Durée envisagée (mois)</label>
+                          <input type="number" min="1" max="480" step="1" x-model.number="quotite.duration_months"
+                                 class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#7c3aed]">
+                        </div>
+                      </div>
+
+                      <div>
+                        <label class="mb-1 block text-xs font-black uppercase text-[#536484]">Montant souhaité (facultatif)</label>
+                        <input type="number" min="0" step="100000" x-model.number="quotite.requested_amount"
+                               placeholder="Ex. 30 000 000"
+                               class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#7c3aed]">
+                      </div>
+
+                      <div class="flex flex-wrap gap-3">
+                        <button type="submit" :disabled="quotite.loading"
+                                class="rounded-2xl bg-[#7c3aed] px-6 py-3 text-sm font-black text-white shadow-lg shadow-purple-900/20 disabled:opacity-60">
+                          <i class="fa-solid" :class="quotite.loading ? 'fa-spinner fa-spin' : 'fa-gauge-high'"></i>
+                          <span x-text="quotite.loading ? 'Calcul…' : 'Calculer ma quotité'"></span>
+                        </button>
+                        <button type="button" @click="resetQuotite()" class="rounded-2xl border border-[#dce7f6] bg-white px-6 py-3 text-sm font-black text-[#06194a]">Réinitialiser</button>
+                      </div>
+                      <p x-show="quotite.error" x-cloak class="rounded-xl bg-red-50 p-3 text-xs font-bold text-red-700" x-text="quotite.error"></p>
+                    </form>
+                  </div>
+
+                  {# Résultats quotité #}
+                  <div class="rounded-[28px] bg-gradient-to-br from-[#06194a] to-[#003b98] p-7 text-white shadow-2xl shadow-blue-950/20">
+                    <h3 class="text-xl font-black"><i class="fa-solid fa-chart-pie text-[#caff3d]"></i> Votre capacité</h3>
+                    <template x-if="quotite.result">
+                      <div class="mt-5 grid gap-4">
+                        <div class="rounded-2xl p-5"
+                             :class="{
+                               'bg-[#0aa25f]': quotite.result.decision==='eligible',
+                               'bg-[#b97900]': quotite.result.decision==='conditional',
+                               'bg-[#c93838]': quotite.result.decision==='rejected',
+                               'bg-white/10': quotite.result.decision==='info'
+                             }">
+                          <span class="text-xs font-black uppercase text-white/80">Décision</span>
+                          <b class="mt-1 block text-2xl font-black" x-text="quotite.result.decision_label"></b>
+                          <small class="block text-xs font-bold text-white/80">Taux endettement : <span x-text="quotite.result.debt_ratio.toFixed(1)"></span>%</small>
+                        </div>
+
+                        <div class="grid gap-3 sm:grid-cols-2">
+                          <div class="rounded-2xl bg-white/10 p-4">
+                            <span class="text-xs font-black uppercase text-white/70">Mensualité max autorisée</span>
+                            <b class="mt-1 block text-lg text-[#caff3d]" x-text="fmt(quotite.result.max_authorized) + ' FCFA'"></b>
+                          </div>
+                          <div class="rounded-2xl bg-white/10 p-4">
+                            <span class="text-xs font-black uppercase text-white/70">Capacité nette</span>
+                            <b class="mt-1 block text-lg" x-text="fmt(quotite.result.net_capacity) + ' FCFA'"></b>
+                          </div>
+                          <div class="rounded-2xl bg-white/10 p-4">
+                            <span class="text-xs font-black uppercase text-white/70">Montant finançable</span>
+                            <b class="mt-1 block text-lg text-[#cfff3d]" x-text="fmt(quotite.result.max_finance) + ' FCFA'"></b>
+                          </div>
+                          <div class="rounded-2xl bg-white/10 p-4">
+                            <span class="text-xs font-black uppercase text-white/70">Reste à vivre</span>
+                            <b class="mt-1 block text-lg" x-text="fmt(quotite.result.living_remainder) + ' FCFA'"></b>
+                          </div>
+                        </div>
+
+                        <template x-if="quotite.result.requested_amount > 0">
+                          <div class="rounded-2xl bg-white/10 p-4">
+                            <span class="text-xs font-black uppercase text-white/70">Mensualité estimée pour <span x-text="fmt(quotite.result.requested_amount)"></span> FCFA</span>
+                            <b class="mt-1 block text-xl" x-text="fmt(quotite.result.estimated_payment) + ' FCFA'"></b>
+                          </div>
+                        </template>
+
+                        <template x-if="quotite.result.recommendations.length">
+                          <div class="rounded-2xl bg-[#caff3d]/15 p-4">
+                            <span class="text-xs font-black uppercase text-[#cfff3d]"><i class="fa-solid fa-lightbulb"></i> Recommandations</span>
+                            <ul class="mt-2 grid gap-1 text-xs font-bold text-white">
+                              <template x-for="rec in quotite.result.recommendations" :key="rec">
+                                <li class="flex items-start gap-2"><i class="fa-solid fa-arrow-right mt-1 text-[#caff3d]"></i><span x-text="rec"></span></li>
+                              </template>
+                            </ul>
+                          </div>
+                        </template>
+
+                        <p class="text-xs font-bold text-white/60">
+                          Pour une simulation détaillée et personnalisée par votre mutuelle,
+                          <a href="{% url 'public-mutuelle-signup' %}" class="text-[#caff3d] underline">créez votre espace</a> ou
+                          <button type="button" @click="contactModalOpen=true" class="text-[#caff3d] underline">contactez-nous</button>.
+                        </p>
+                      </div>
+                    </template>
+                    <template x-if="!quotite.result">
+                      <p class="mt-5 rounded-2xl bg-white/10 p-6 text-center text-sm font-bold text-white/70">
+                        <i class="fa-solid fa-arrow-left"></i> Saisissez vos revenus et charges pour obtenir votre capacité d'emprunt.
+                      </p>
+                    </template>
+                  </div>
+                </div>
+              </div>
+            </section>
+
             <section id="reseau" class="mx-auto max-w-[1320px] px-5 py-20 lg:px-8">
                 <div class="mb-10 max-w-3xl">
                     <h2 class="mt-4 text-4xl font-black leading-tight md:text-5xl">Chaque acteur avance avec la bonne
@@ -561,9 +789,7 @@
             </section>
         </main>
 
-        {# ============================================================
-           MODAL "Nous contacter"
-           ============================================================ #}
+
         <div x-show="contactModalOpen" x-cloak
              x-transition.opacity
              class="fixed inset-0 z-[80] flex items-center justify-center bg-[#06194a]/70 backdrop-blur-sm p-4"
@@ -662,4 +888,92 @@
           </div>
         </div>
     </div>
+
+
+    <script>
+      function publicSimulator() {
+        const csrf = document.querySelector('input[name=csrfmiddlewaretoken]')?.value || '';
+        function fmt(n) {
+          if (n === null || n === undefined || isNaN(n)) return '—';
+          return Math.round(Number(n)).toLocaleString('fr-FR');
+        }
+        async function postJSON(url, data) {
+          const body = new URLSearchParams();
+          for (const [k, v] of Object.entries(data)) body.append(k, v);
+          const resp = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'X-CSRFToken': csrf,
+              'X-Requested-With': 'XMLHttpRequest',
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: body.toString(),
+            credentials: 'same-origin',
+          });
+          return resp.json();
+        }
+
+        return {
+          tab: 'credit',
+          fmt,
+          // ---- Crédit ----
+          credit: {
+            amount: 25000000,
+            rate: 7,
+            months: 120,
+            loading: false,
+            error: '',
+            result: null,
+          },
+          async runCredit() {
+            this.credit.loading = true;
+            this.credit.error = '';
+            try {
+              const data = await postJSON("{% url 'public-simulate-credit' %}", {
+                amount: this.credit.amount, rate: this.credit.rate, months: this.credit.months,
+              });
+              if (!data.ok) { this.credit.error = data.error || 'Erreur de calcul.'; this.credit.result = null; }
+              else { this.credit.result = data; }
+            } catch (e) { this.credit.error = 'Erreur réseau. Réessayez.'; }
+            finally { this.credit.loading = false; }
+          },
+          resetCredit() {
+            this.credit = { amount: 25000000, rate: 7, months: 120, loading: false, error: '', result: null };
+          },
+          // ---- Quotité cessible ----
+          quotite: {
+            net_salary: 600000,
+            complementary_income: 0,
+            fixed_charges: 150000,
+            existing_loans: 0,
+            max_debt_ratio: 33,
+            annual_rate: 7,
+            duration_months: 180,
+            requested_amount: 0,
+            loading: false,
+            error: '',
+            result: null,
+          },
+          async runQuotite() {
+            this.quotite.loading = true;
+            this.quotite.error = '';
+            try {
+              const payload = { ...this.quotite };
+              delete payload.loading; delete payload.error; delete payload.result;
+              const data = await postJSON("{% url 'public-simulate-quotite' %}", payload);
+              if (!data.ok) { this.quotite.error = data.error || 'Erreur de calcul.'; this.quotite.result = null; }
+              else { this.quotite.result = data; }
+            } catch (e) { this.quotite.error = 'Erreur réseau. Réessayez.'; }
+            finally { this.quotite.loading = false; }
+          },
+          resetQuotite() {
+            this.quotite = {
+              net_salary: 600000, complementary_income: 0, fixed_charges: 150000, existing_loans: 0,
+              max_debt_ratio: 33, annual_rate: 7, duration_months: 180, requested_amount: 0,
+              loading: false, error: '', result: null,
+            };
+          },
+        };
+      }
+    </script>
 {% endblock %}

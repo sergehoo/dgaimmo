@@ -35,6 +35,8 @@ from dashboard.views import (
     finance_export_csv,
     governance_center,
     landing_page,
+    public_simulate_credit,
+    public_simulate_quotite,
     submit_contact_request,
     members_center,
     notifications_center,
@@ -62,6 +64,9 @@ from dashboard.views import (
 urlpatterns = [
     path("", landing_page, name="landing-page"),
     path("contact/", submit_contact_request, name="submit-contact-request"),
+    # Simulateurs publics AJAX (sans auth, JSON)
+    path("api/public/simulate-credit/", public_simulate_credit, name="public-simulate-credit"),
+    path("api/public/simulate-quotite/", public_simulate_quotite, name="public-simulate-quotite"),
     path("creer-une-mutuelle/", public_mutuelle_signup, name="public-mutuelle-signup"),
     path("connexion/", SecureLoginView.as_view(), name="login"),
     path("deconnexion/", LogoutView.as_view(), name="logout"),

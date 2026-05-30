@@ -463,6 +463,153 @@ def landing_page(request):
     return render(request, "dashboard/landing.html", context)
 
 
+# ===========================================================================
+# Simulateurs publics AJAX (landing page) — pas d'authentification requise
+# ===========================================================================
+def _json_error(message, status=400):
+    from django.http import JsonResponse
+    return JsonResponse({"ok": False, "error": message}, status=status)
+
+
+def public_simulate_credit(request):
+    """POST AJAX : calcule la mensualité, l'intérêt total, le coût total
+    d'un crédit immobilier à partir de (montant, taux annuel %, durée mois).
+
+    Sans authentification, sans persistance — uniquement du calcul.
+    """
+    from django.http import JsonResponse
+    from decimal import Decimal, InvalidOperation
+    from real_estate.services import monthly_payment
+
+    if request.method != "POST":
+        return _json_error("Méthode non autorisée.", status=405)
+
+    try:
+        amount = Decimal(str(request.POST.get("amount", "0")).replace(",", "."))
+        rate = Decimal(str(request.POST.get("rate", "7")).replace(",", "."))
+        months = int(request.POST.get("months", "120"))
+    except (InvalidOperation, ValueError, TypeError):
+        return _json_error("Valeurs numériques invalides.")
+
+    if amount <= 0 or months <= 0:
+        return _json_error("Le montant et la durée doivent être strictement positifs.")
+    if rate < 0 or rate > 50:
+        return _json_error("Le taux doit être compris entre 0 et 50 %.")
+
+    payment = monthly_payment(amount, rate, months)
+    total_cost = payment * months
+    total_interest = total_cost - amount
+
+    return JsonResponse({
+        "ok": True,
+        "monthly_payment": float(payment),
+        "total_cost": float(total_cost),
+        "total_interest": float(total_interest),
+        "amount": float(amount),
+        "rate": float(rate),
+        "months": months,
+        "years": round(months / 12, 1),
+    })
+
+
+def public_simulate_quotite(request):
+    """POST AJAX : simulateur grand public de quotité cessible.
+
+    Entrées : revenu net mensuel, revenus complémentaires, charges fixes,
+    autres prêts en cours (mensualité totale), taux d'endettement max %.
+
+    Retour : capacité brute, capacité nette, reste à vivre, montant
+    finançable, taux d'endettement, décision (éligible / sous réserve /
+    non éligible).
+    """
+    from django.http import JsonResponse
+    from decimal import Decimal, InvalidOperation
+    from real_estate.services import monthly_payment, financeable_amount
+
+    if request.method != "POST":
+        return _json_error("Méthode non autorisée.", status=405)
+
+    def _dec(name, default="0"):
+        return Decimal(str(request.POST.get(name, default)).replace(",", "."))
+
+    try:
+        net_salary = _dec("net_salary")
+        complementary = _dec("complementary_income")
+        fixed_charges = _dec("fixed_charges")
+        existing_loans = _dec("existing_loans")
+        max_debt_ratio = _dec("max_debt_ratio", "33")
+        annual_rate = _dec("annual_rate", "7")
+        duration_months = int(request.POST.get("duration_months", "120"))
+        requested_amount = _dec("requested_amount", "0")
+    except (InvalidOperation, ValueError, TypeError):
+        return _json_error("Valeurs numériques invalides.")
+
+    if net_salary <= 0:
+        return _json_error("Le revenu net mensuel doit être strictement positif.")
+    if max_debt_ratio <= 0 or max_debt_ratio > 100:
+        return _json_error("Le taux d'endettement doit être entre 1 et 100 %.")
+    if duration_months <= 0 or duration_months > 480:
+        return _json_error("La durée doit être entre 1 et 480 mois.")
+
+    total_income = net_salary + complementary
+    monthly_charges = fixed_charges
+    max_authorized = total_income * max_debt_ratio / Decimal("100")
+    net_capacity = max(max_authorized - monthly_charges - existing_loans, Decimal("0"))
+
+    # Mensualité estimée (si l'utilisateur a indiqué un montant souhaité)
+    estimated_payment = monthly_payment(requested_amount, annual_rate, duration_months) if requested_amount > 0 else Decimal("0")
+    living_remainder = total_income - monthly_charges - existing_loans - estimated_payment
+    debt_ratio = (
+        Decimal("0") if total_income == 0
+        else ((monthly_charges + existing_loans + estimated_payment) / total_income) * 100
+    )
+
+    # Montant finançable maximum sur la durée demandée
+    max_finance = financeable_amount(net_capacity, annual_rate, duration_months)
+
+    # Décision (même logique que simulate_quotite interne)
+    if requested_amount > 0:
+        if estimated_payment <= net_capacity and living_remainder > total_income * Decimal("0.35"):
+            decision = "eligible"
+            decision_label = "Éligible"
+        elif estimated_payment <= max_authorized and living_remainder > 0:
+            decision = "conditional"
+            decision_label = "Éligible sous réserve"
+        else:
+            decision = "rejected"
+            decision_label = "Non éligible"
+    else:
+        decision = "info"
+        decision_label = "Capacité estimée"
+
+    recommendations = []
+    if debt_ratio > max_debt_ratio:
+        recommendations.append("Réduire le montant demandé ou allonger la durée.")
+    if living_remainder < total_income * Decimal("0.25"):
+        recommendations.append("Reste à vivre faible — prévoir une marge de sécurité.")
+    if existing_loans > total_income * Decimal("0.2"):
+        recommendations.append("Crédits en cours significatifs — renégocier ou regrouper.")
+
+    return JsonResponse({
+        "ok": True,
+        "total_income": float(total_income),
+        "monthly_charges": float(monthly_charges),
+        "existing_loans": float(existing_loans),
+        "max_authorized": float(max_authorized),
+        "net_capacity": float(net_capacity),
+        "max_finance": float(max_finance),
+        "estimated_payment": float(estimated_payment),
+        "living_remainder": float(living_remainder),
+        "debt_ratio": float(debt_ratio),
+        "decision": decision,
+        "decision_label": decision_label,
+        "recommendations": recommendations,
+        "requested_amount": float(requested_amount),
+        "annual_rate": float(annual_rate),
+        "duration_months": duration_months,
+    })
+
+
 def submit_contact_request(request):
     """POST endpoint : enregistre une demande de contact + email aux admins.
 
