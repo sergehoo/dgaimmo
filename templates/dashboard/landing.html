@@ -261,8 +261,8 @@
                       <div>
                         <label class="mb-1 block text-xs font-black uppercase text-[#536484]">Montant emprunté (FCFA)</label>
                         <input type="number" min="100000" step="100000" x-model.number="credit.amount"
-                               class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#0b55d9]"
-                        >
+                               placeholder="Ex. 25 000 000"
+                               class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#0b55d9]">
                       </div>
                       <div>
                         <label class="mb-1 flex items-center justify-between text-xs font-black uppercase text-[#536484]">
@@ -283,11 +283,13 @@
                           <input type="number" min="0" max="50" step="0.1" x-model.number="credit.rate"
                                  :disabled="!!credit.bank_id"
                                  :class="credit.bank_id ? 'cursor-not-allowed bg-[#f7faff] text-[#536484]' : ''"
+                                 placeholder="Ex. 7,5"
                                  class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#0b55d9]">
                         </div>
                         <div>
                           <label class="mb-1 block text-xs font-black uppercase text-[#536484]">Durée (mois)</label>
                           <input type="number" min="1" max="480" step="1" x-model.number="credit.months"
+                                 placeholder="Ex. 240 (20 ans)"
                                  class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#0b55d9]">
                         </div>
                       </div>
@@ -345,21 +347,25 @@
                         <div>
                           <label class="mb-1 block text-xs font-black uppercase text-[#536484]">Revenu net mensuel (FCFA)</label>
                           <input type="number" min="0" step="10000" x-model.number="quotite.net_salary"
+                                 placeholder="Ex. 600 000"
                                  class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#7c3aed]">
                         </div>
                         <div>
                           <label class="mb-1 block text-xs font-black uppercase text-[#536484]">Revenus complémentaires</label>
                           <input type="number" min="0" step="10000" x-model.number="quotite.complementary_income"
+                                 placeholder="Optionnel"
                                  class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#7c3aed]">
                         </div>
                         <div>
                           <label class="mb-1 block text-xs font-black uppercase text-[#536484]">Charges fixes mensuelles</label>
                           <input type="number" min="0" step="10000" x-model.number="quotite.fixed_charges"
+                                 placeholder="Ex. 150 000"
                                  class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#7c3aed]">
                         </div>
                         <div>
                           <label class="mb-1 block text-xs font-black uppercase text-[#536484]">Prêts en cours (mensualité)</label>
                           <input type="number" min="0" step="5000" x-model.number="quotite.existing_loans"
+                                 placeholder="0 si aucun"
                                  class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#7c3aed]">
                         </div>
                       </div>
@@ -382,6 +388,7 @@
                         <div>
                           <label class="mb-1 block text-xs font-black uppercase text-[#536484]">Taux endettement max (%)</label>
                           <input type="number" min="1" max="100" step="1" x-model.number="quotite.max_debt_ratio"
+                                 placeholder="33 (norme UEMOA)"
                                  class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#7c3aed]">
                         </div>
                         <div>
@@ -389,11 +396,13 @@
                           <input type="number" min="0" max="50" step="0.1" x-model.number="quotite.annual_rate"
                                  :disabled="!!quotite.bank_id"
                                  :class="quotite.bank_id ? 'cursor-not-allowed bg-[#f7faff] text-[#536484]' : ''"
+                                 placeholder="Ex. 7,5"
                                  class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#7c3aed]">
                         </div>
                         <div>
                           <label class="mb-1 block text-xs font-black uppercase text-[#536484]">Durée envisagée (mois)</label>
                           <input type="number" min="1" max="480" step="1" x-model.number="quotite.duration_months"
+                                 placeholder="Ex. 180 (15 ans)"
                                  class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#7c3aed]">
                         </div>
                       </div>
@@ -979,11 +988,11 @@
               }
             }
           },
-          // ---- Crédit ----
+          // ---- Crédit ---- (champs vides : l'utilisateur saisit ses propres valeurs)
           credit: {
-            amount: 25000000,
-            rate: 7,
-            months: 120,
+            amount: null,
+            rate: null,
+            months: null,
             bank_id: '',
             loading: false,
             error: '',
@@ -1002,18 +1011,18 @@
             finally { this.credit.loading = false; }
           },
           resetCredit() {
-            this.credit = { amount: 25000000, rate: 7, months: 120, bank_id: '', loading: false, error: '', result: null };
+            this.credit = { amount: null, rate: null, months: null, bank_id: '', loading: false, error: '', result: null };
           },
-          // ---- Quotité cessible ----
+          // ---- Quotité cessible ---- (champs vides au démarrage)
           quotite: {
-            net_salary: 600000,
-            complementary_income: 0,
-            fixed_charges: 150000,
-            existing_loans: 0,
-            max_debt_ratio: 33,
-            annual_rate: 7,
-            duration_months: 180,
-            requested_amount: 0,
+            net_salary: null,
+            complementary_income: null,
+            fixed_charges: null,
+            existing_loans: null,
+            max_debt_ratio: null,
+            annual_rate: null,
+            duration_months: null,
+            requested_amount: null,
             bank_id: '',
             loading: false,
             error: '',
@@ -1033,8 +1042,8 @@
           },
           resetQuotite() {
             this.quotite = {
-              net_salary: 600000, complementary_income: 0, fixed_charges: 150000, existing_loans: 0,
-              max_debt_ratio: 33, annual_rate: 7, duration_months: 180, requested_amount: 0,
+              net_salary: null, complementary_income: null, fixed_charges: null, existing_loans: null,
+              max_debt_ratio: null, annual_rate: null, duration_months: null, requested_amount: null,
               bank_id: '', loading: false, error: '', result: null,
             };
           },
