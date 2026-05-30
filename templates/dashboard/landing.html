@@ -262,11 +262,11 @@
                         <label class="mb-1 block text-xs font-black uppercase text-[#536484]">Montant emprunté (FCFA)</label>
                         <input type="number" min="100000" step="100000" x-model.number="credit.amount"
                                class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#0b55d9]"
-                               placeholder="Ex. 25 000 000">
+                        >
                       </div>
                       <div>
                         <label class="mb-1 flex items-center justify-between text-xs font-black uppercase text-[#536484]">
-                          <span><i class="fa-solid fa-building-columns"></i> Banque (optionnel — auto-remplit le taux)</span>
+                          <span><i class="fa-solid fa-building-columns"></i> Banque (Partenaires)</span>
                           <span x-show="credit.bank_id" x-cloak class="rounded-full bg-[#e8fff2] px-2 py-0.5 text-[10px] text-[#0b9f5b]">Taux appliqué</span>
                         </label>
                         <select x-model="credit.bank_id" @change="applyBankRate('credit')"
