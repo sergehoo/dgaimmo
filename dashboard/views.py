@@ -562,6 +562,54 @@ def public_banks_list(request):
     return JsonResponse({"ok": True, "banks": payload})
 
 
+def _parse_decimal_field(post, key, label, *, required=True, default=None, min_val=None, max_val=None):
+    """Convertit un champ POST en Decimal avec messages d'erreur explicites.
+
+    Retourne (value, error_message). Si error_message est non nul, value est None.
+    """
+    from decimal import Decimal, InvalidOperation
+
+    raw = post.get(key, "")
+    if raw is None:
+        raw = ""
+    raw = str(raw).strip().replace(",", ".").replace(" ", "")
+
+    if not raw:
+        if required:
+            return None, f"Le champ « {label} » est obligatoire."
+        return (default if default is not None else Decimal("0")), None
+    try:
+        value = Decimal(raw)
+    except (InvalidOperation, ValueError):
+        return None, f"Le champ « {label} » doit être un nombre valide (vous avez saisi : « {raw} »)."
+    if min_val is not None and value < min_val:
+        return None, f"Le champ « {label} » doit être au minimum {min_val}."
+    if max_val is not None and value > max_val:
+        return None, f"Le champ « {label} » doit être au maximum {max_val}."
+    return value, None
+
+
+def _parse_int_field(post, key, label, *, required=True, default=None, min_val=None, max_val=None):
+    raw = post.get(key, "")
+    if raw is None:
+        raw = ""
+    raw = str(raw).strip().replace(" ", "")
+
+    if not raw:
+        if required:
+            return None, f"Le champ « {label} » est obligatoire."
+        return (default if default is not None else 0), None
+    try:
+        value = int(float(raw))
+    except (ValueError, TypeError):
+        return None, f"Le champ « {label} » doit être un nombre entier (vous avez saisi : « {raw} »)."
+    if min_val is not None and value < min_val:
+        return None, f"Le champ « {label} » doit être au minimum {min_val}."
+    if max_val is not None and value > max_val:
+        return None, f"Le champ « {label} » doit être au maximum {max_val}."
+    return value, None
+
+
 def public_simulate_credit(request):
     """POST AJAX : calcule la mensualité, l'intérêt total, le coût total
     d'un crédit immobilier à partir de (montant, taux annuel %, durée mois).
@@ -569,23 +617,20 @@ def public_simulate_credit(request):
     Sans authentification, sans persistance — uniquement du calcul.
     """
     from django.http import JsonResponse
-    from decimal import Decimal, InvalidOperation
     from real_estate.services import monthly_payment
 
     if request.method != "POST":
         return _json_error("Méthode non autorisée.", status=405)
 
-    try:
-        amount = Decimal(str(request.POST.get("amount", "0")).replace(",", "."))
-        rate = Decimal(str(request.POST.get("rate", "7")).replace(",", "."))
-        months = int(request.POST.get("months", "120"))
-    except (InvalidOperation, ValueError, TypeError):
-        return _json_error("Valeurs numériques invalides.")
-
-    if amount <= 0 or months <= 0:
-        return _json_error("Le montant et la durée doivent être strictement positifs.")
-    if rate < 0 or rate > 50:
-        return _json_error("Le taux doit être compris entre 0 et 50 %.")
+    amount, err = _parse_decimal_field(request.POST, "amount", "Montant emprunté", required=True, min_val=1)
+    if err:
+        return _json_error(err)
+    rate, err = _parse_decimal_field(request.POST, "rate", "Taux annuel", required=True, min_val=0, max_val=50)
+    if err:
+        return _json_error(err)
+    months, err = _parse_int_field(request.POST, "months", "Durée (mois)", required=True, min_val=1, max_val=480)
+    if err:
+        return _json_error(err)
 
     payment = monthly_payment(amount, rate, months)
     total_cost = payment * months
@@ -614,33 +659,53 @@ def public_simulate_quotite(request):
     non éligible).
     """
     from django.http import JsonResponse
-    from decimal import Decimal, InvalidOperation
+    from decimal import Decimal
     from real_estate.services import monthly_payment, financeable_amount
 
     if request.method != "POST":
         return _json_error("Méthode non autorisée.", status=405)
 
-    def _dec(name, default="0"):
-        return Decimal(str(request.POST.get(name, default)).replace(",", "."))
-
-    try:
-        net_salary = _dec("net_salary")
-        complementary = _dec("complementary_income")
-        fixed_charges = _dec("fixed_charges")
-        existing_loans = _dec("existing_loans")
-        max_debt_ratio = _dec("max_debt_ratio", "33")
-        annual_rate = _dec("annual_rate", "7")
-        duration_months = int(request.POST.get("duration_months", "120"))
-        requested_amount = _dec("requested_amount", "0")
-    except (InvalidOperation, ValueError, TypeError):
-        return _json_error("Valeurs numériques invalides.")
-
-    if net_salary <= 0:
-        return _json_error("Le revenu net mensuel doit être strictement positif.")
-    if max_debt_ratio <= 0 or max_debt_ratio > 100:
-        return _json_error("Le taux d'endettement doit être entre 1 et 100 %.")
-    if duration_months <= 0 or duration_months > 480:
-        return _json_error("La durée doit être entre 1 et 480 mois.")
+    # ---- Validation champ par champ avec messages explicites ----
+    net_salary, err = _parse_decimal_field(
+        request.POST, "net_salary", "Revenu net mensuel", required=True, min_val=Decimal("1")
+    )
+    if err:
+        return _json_error(err)
+    complementary, err = _parse_decimal_field(
+        request.POST, "complementary_income", "Revenus complémentaires", required=False, default=Decimal("0"), min_val=0
+    )
+    if err:
+        return _json_error(err)
+    fixed_charges, err = _parse_decimal_field(
+        request.POST, "fixed_charges", "Charges fixes mensuelles", required=False, default=Decimal("0"), min_val=0
+    )
+    if err:
+        return _json_error(err)
+    existing_loans, err = _parse_decimal_field(
+        request.POST, "existing_loans", "Prêts en cours (mensualité)", required=False, default=Decimal("0"), min_val=0
+    )
+    if err:
+        return _json_error(err)
+    max_debt_ratio, err = _parse_decimal_field(
+        request.POST, "max_debt_ratio", "Taux d'endettement max", required=True, min_val=Decimal("1"), max_val=Decimal("100")
+    )
+    if err:
+        return _json_error(err)
+    annual_rate, err = _parse_decimal_field(
+        request.POST, "annual_rate", "Taux annuel", required=True, min_val=Decimal("0"), max_val=Decimal("50")
+    )
+    if err:
+        return _json_error(err)
+    duration_months, err = _parse_int_field(
+        request.POST, "duration_months", "Durée envisagée (mois)", required=True, min_val=1, max_val=480
+    )
+    if err:
+        return _json_error(err)
+    requested_amount, err = _parse_decimal_field(
+        request.POST, "requested_amount", "Montant souhaité", required=False, default=Decimal("0"), min_val=0
+    )
+    if err:
+        return _json_error(err)
 
     total_income = net_salary + complementary
     monthly_charges = fixed_charges
