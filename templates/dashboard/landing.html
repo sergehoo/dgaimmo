@@ -229,47 +229,414 @@
                 </div>
             </section>
 
+            <section id="quotite" class="bg-[#06194a]">
+                <div class="mx-auto grid max-w-[1320px] gap-10 px-5 py-20 text-white lg:grid-cols-[.9fr_1.1fr] lg:px-8">
+                    <div>
+                        <span class="text-xs font-black uppercase tracking-[.16em] text-[#caff3d]">Quotité cessible</span>
+                        <h2 class="mt-4 text-4xl font-black leading-tight md:text-5xl">La décision ne part plus d’une
+                            intuition, mais d’une capacité réelle.</h2>
+                        <p class="mt-5 text-lg leading-8 text-white/70">DGA-Mutuelle calcule la mensualité maximale par
+                            membre, puis consolide la capacité de toute la mutuelle pour dimensionner un programme
+                            immobilier collectif.</p>
 
-            <section id="simulateurs" class="bg-gradient-to-br from-[#f7faff] via-white to-[#eef4ff] py-20"
-                     x-data="publicSimulator()">
-              <div class="mx-auto max-w-[1320px] px-5 lg:px-8">
-                <div class="mb-10 max-w-3xl">
-                  <p class="inline-flex rounded-full border border-[#dce8f8] bg-white px-4 py-2 text-xs font-black uppercase tracking-[.16em] text-[#0b55d9] shadow-sm"><i class="fa-solid fa-calculator"></i> Simulateurs gratuits</p>
-                  <h2 class="mt-5 text-3xl font-black leading-tight md:text-4xl">Testez votre capacité d'emprunt en quelques clics.</h2>
-                  <p class="mt-4 text-base font-semibold leading-7 text-[#536484]">Aucune inscription requise. Les résultats s'affichent instantanément à partir des informations que vous saisissez.</p>
+                    </div>
+                    <div class="grid gap-4 md:grid-cols-2">
+                        <div class="rounded-3xl bg-white/10 p-6"><span
+                                class="text-xs font-black uppercase text-white/50">Membre</span><b
+                                class="mt-4 block text-3xl">150 000 000 FCFA</b>
+                            <p class="mt-2 text-sm font-bold text-white/70">Montant maximal estimé selon revenus,
+                                charges, crédits et reste à vivre.</p></div>
+                        <div class="rounded-3xl bg-white p-6 text-[#06194a]"><span
+                                class="text-xs font-black uppercase text-[#536484]">Mutuelle</span><b
+                                class="mt-4 block text-3xl">3,25 Md FCFA</b>
+                            <p class="mt-2 text-sm font-bold text-[#536484]">Capacité d’emprunt collective pour
+                                négociation bancaire.</p></div>
+                        <div class="rounded-3xl bg-[#caff3d] p-6 text-[#06194a]"><span
+                                class="text-xs font-black uppercase text-[#31430b]">Risque</span><b
+                                class="mt-4 block text-3xl">78/100</b>
+                            <p class="mt-2 text-sm font-bold text-[#31430b]">Score global basé sur la régularité, KYC,
+                                solvabilité et historique.</p></div>
+                        <div class="rounded-3xl bg-white/10 p-6"><span
+                                class="text-xs font-black uppercase text-white/50">Amortissement</span><b
+                                class="mt-4 block text-3xl">120 mois</b>
+                            <p class="mt-2 text-sm font-bold text-white/70">Période d’amortissement moyenne suivie par
+                                membre et par mutuelle.</p></div>
+                    </div>
+                </div>
+            </section>
+
+
+            <section id="simulateurs"
+                     class="relative overflow-hidden bg-gradient-to-br from-[#f7faff] via-white to-[#eef4ff] py-20"
+                     x-data="quotiteCessibleAssistant()" x-init="init()">
+              <div class="mx-auto max-w-[1440px] px-5 lg:px-8">
+                <div class="mb-8 max-w-3xl">
+                  <p class="inline-flex gap-2 rounded-full border border-[#dce8f8] bg-white px-4 py-2 text-xs font-black uppercase tracking-[.16em] text-[#0b55d9] shadow-sm">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Simulateurs IA gratuits
+                  </p>
+                  <h2 class="mt-5 text-3xl font-black leading-tight md:text-4xl">Votre capacité réelle &amp; votre crédit immobilier — en temps réel.</h2>
+                  <p class="mt-4 text-base font-semibold leading-7 text-[#536484]">
+                    Deux outils complémentaires : quotité cessible complète avec IA, ou simulation rapide d'un crédit immobilier.
+                  </p>
                 </div>
 
-                {# --- Onglets simulateurs --- #}
-                <div class="flex flex-wrap gap-2 rounded-2xl border border-[#e5edf8] bg-white p-2 shadow-sm">
-                  <button type="button" @click="tab='credit'"
-                          :class="tab==='credit' ? 'bg-[#0b55d9] text-white shadow-md' : 'bg-transparent text-[#06194a] hover:bg-[#f3f7ff]'"
+                {# ===== ONGLETS ===== #}
+                <div class="mb-6 inline-flex flex-wrap gap-2 rounded-2xl border border-[#e5edf8] bg-white p-2 shadow-sm">
+                    <button type="button" @click="activeTab='credit'"
+                          :class="activeTab==='credit' ? 'bg-[#0b55d9] text-white shadow-md' : 'bg-transparent text-[#06194a] hover:bg-[#f3f7ff]'"
                           class="flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-black transition">
-                    <i class="fa-solid fa-house-chimney-window"></i> Simulation de crédit immobilier
+                    <i class="fa-solid fa-house-chimney-window"></i> Simulateur de crédit
                   </button>
-                  <button type="button" @click="tab='quotite'"
-                          :class="tab==='quotite' ? 'bg-[#0b55d9] text-white shadow-md' : 'bg-transparent text-[#06194a] hover:bg-[#f3f7ff]'"
+                    <button type="button" @click="activeTab='quotite'"
+                          :class="activeTab==='quotite' ? 'bg-[#0b55d9] text-white shadow-md' : 'bg-transparent text-[#06194a] hover:bg-[#f3f7ff]'"
                           class="flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-black transition">
                     <i class="fa-solid fa-scale-balanced"></i> Quotité cessible
                   </button>
+
                 </div>
 
-                {# ===== ONGLET CRÉDIT ===== #}
-                <div x-show="tab==='credit'" x-transition.opacity class="mt-6 grid gap-6 xl:grid-cols-[1fr_1fr]">
-                  <div class="rounded-[28px] border border-[#e5edf8] bg-white p-7 shadow-sm">
-                    <h3 class="text-xl font-black"><i class="fa-solid fa-sliders text-[#0b55d9]"></i> Paramètres du crédit</h3>
-                    <form @submit.prevent="runCredit()" class="mt-5 grid gap-5">
-                      <div>
-                        <label class="mb-1 block text-xs font-black uppercase text-[#536484]">Montant emprunté (FCFA)</label>
-                        <input type="number" min="100000" step="100000" x-model.number="credit.amount"
-                               placeholder="Ex. 25 000 000"
-                               class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#0b55d9]">
+                {# ===== ONGLET 1 — QUOTITÉ CESSIBLE ===== #}
+                <div x-show="activeTab==='quotite'" x-transition.opacity class="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
+
+                  {# ========== COLONNE GAUCHE : SAISIE ========== #}
+                  <div class="rounded-[28px] border border-[#e5edf8] bg-white p-6 shadow-xl shadow-blue-950/5">
+                    <h3 class="text-xl font-black text-[#06194a]"><i class="fa-solid fa-keyboard text-[#0b55d9]"></i> Mes informations</h3>
+
+                    {# Salaire net (obligatoire) #}
+                    <div class="mt-5">
+                      <label class="mb-1 block text-xs font-black uppercase text-[#536484]">Salaire net mensuel <span class="text-red-500">*</span></label>
+                      <input type="text" inputmode="numeric" autocomplete="off"
+                             :value="fmtIn(form.net_salary)"
+                             @input.debounce.400ms="onAmountInput('form', 'net_salary', $event)"
+                             placeholder="Ex. 800 000"
+                             class="min-h-12 w-full rounded-xl border-2 border-[#0b55d9] bg-white px-4 text-base font-black text-[#06194a] outline-none">
+                      <p x-show="form.net_salary > 0" x-cloak class="mt-2 text-xs font-bold text-[#0b55d9]">
+                        <i class="fa-solid fa-circle-info"></i>
+                        Tranche : <span x-text="bracketLabel()"></span>
+                      </p>
+                    </div>
+
+                    {# Revenus additionnels dynamiques #}
+                    <div class="mt-6 border-t border-[#edf2fb] pt-5">
+                      <div class="mb-3 flex items-center justify-between">
+                        <label class="text-xs font-black uppercase text-[#536484]"><i class="fa-solid fa-circle-plus text-[#0aa25f]"></i> Revenus additionnels <span class="normal-case text-[#8794aa]">(facultatif)</span></label>
+                        <button type="button" @click="addRevenue()" class="rounded-lg bg-[#e8fff2] px-3 py-1 text-xs font-black text-[#0aa25f]"><i class="fa-solid fa-plus"></i> Ajouter</button>
                       </div>
+                      <div class="grid gap-2">
+                        <template x-for="(r, idx) in form.revenues" :key="idx">
+                          <div class="flex items-center gap-2 rounded-xl bg-[#f7faff] p-2">
+                            <select x-model="r.type" @change="run()" class="min-h-10 flex-1 rounded-lg border border-[#dbe6f5] bg-white px-3 text-xs font-bold">
+                              <option value="prime_fonction">Prime de fonction</option>
+                              <option value="prime_transport">Prime de transport</option>
+                              <option value="prime_logement">Prime de logement</option>
+                              <option value="prime_rendement">Prime de rendement</option>
+                              <option value="heures_sup">Heures supplémentaires</option>
+                              <option value="locatif">Revenus locatifs</option>
+                              <option value="activite_secondaire">Activité secondaire</option>
+                              <option value="commerce">Commerce</option>
+                              <option value="pension">Pension</option>
+                              <option value="dividendes">Dividendes</option>
+                              <option value="autre">Autres revenus</option>
+                            </select>
+                            <input type="text" inputmode="numeric" autocomplete="off"
+                                   :value="fmtIn(r.amount)"
+                                   @input.debounce.400ms="onAmountInput(r, 'amount', $event)"
+                                   placeholder="Montant FCFA"
+                                   class="min-h-10 w-36 rounded-lg border border-[#dbe6f5] bg-white px-3 text-xs font-bold">
+                            <button type="button" @click="removeRevenue(idx)" class="grid h-9 w-9 place-items-center rounded-lg bg-red-50 text-red-600" title="Supprimer">
+                              <i class="fa-solid fa-trash"></i>
+                            </button>
+                          </div>
+                        </template>
+                        <p x-show="form.revenues.length === 0" class="rounded-xl bg-[#f7faff] p-3 text-center text-xs font-bold text-[#8794aa]">Aucun revenu additionnel</p>
+                      </div>
+                    </div>
+
+                    {# Charges mensuelles dynamiques #}
+                    <div class="mt-6 border-t border-[#edf2fb] pt-5">
+                      <div class="mb-3 flex items-center justify-between">
+                        <label class="text-xs font-black uppercase text-[#536484]"><i class="fa-solid fa-receipt text-[#b56a00]"></i> Charges mensuelles <span class="normal-case text-[#8794aa]">(facultatif)</span></label>
+                        <button type="button" @click="addCharge()" class="rounded-lg bg-[#fff4e5] px-3 py-1 text-xs font-black text-[#b56a00]"><i class="fa-solid fa-plus"></i> Ajouter</button>
+                      </div>
+                      <div class="grid gap-2">
+                        <template x-for="(c, idx) in form.charges" :key="idx">
+                          <div class="flex items-center gap-2 rounded-xl bg-[#fff7df] p-2">
+                            <select x-model="c.type" @change="run()" class="min-h-10 flex-1 rounded-lg border border-[#dbe6f5] bg-white px-3 text-xs font-bold">
+                              <option value="loyer">Loyer</option>
+                              <option value="eau">Eau</option>
+                              <option value="electricite">Électricité</option>
+                              <option value="internet">Internet</option>
+                              <option value="telephone">Téléphone</option>
+                              <option value="scolarite">Scolarité</option>
+                              <option value="assurance">Assurance</option>
+                              <option value="pension_alim">Pension alimentaire</option>
+                              <option value="transport">Transport</option>
+                              <option value="credit_conso">Crédit consommation</option>
+                              <option value="autre">Autres charges</option>
+                            </select>
+                            <input type="text" inputmode="numeric" autocomplete="off"
+                                   :value="fmtIn(c.amount)"
+                                   @input.debounce.400ms="onAmountInput(c, 'amount', $event)"
+                                   placeholder="Montant FCFA"
+                                   class="min-h-10 w-36 rounded-lg border border-[#dbe6f5] bg-white px-3 text-xs font-bold">
+                            <button type="button" @click="removeCharge(idx)" class="grid h-9 w-9 place-items-center rounded-lg bg-red-50 text-red-600">
+                              <i class="fa-solid fa-trash"></i>
+                            </button>
+                          </div>
+                        </template>
+                        <p x-show="form.charges.length === 0" class="rounded-xl bg-[#f7faff] p-3 text-center text-xs font-bold text-[#8794aa]">Aucune charge</p>
+                      </div>
+                    </div>
+
+                    {# Crédits en cours dynamiques #}
+                    <div class="mt-6 border-t border-[#edf2fb] pt-5">
+                      <div class="mb-3 flex items-center justify-between">
+                        <label class="text-xs font-black uppercase text-[#536484]"><i class="fa-solid fa-credit-card text-[#7c3aed]"></i> Crédits en cours <span class="normal-case text-[#8794aa]">(facultatif)</span></label>
+                        <button type="button" @click="addCredit()" class="rounded-lg bg-[#ede9fe] px-3 py-1 text-xs font-black text-[#7c3aed]"><i class="fa-solid fa-plus"></i> Ajouter</button>
+                      </div>
+                      <div class="grid gap-2">
+                        <template x-for="(c, idx) in form.credits" :key="idx">
+                          <div class="grid gap-2 rounded-xl bg-[#ede9fe]/40 p-2 sm:grid-cols-[1fr_1fr_auto]">
+                            <select x-model="c.type" @change="run()" class="min-h-10 rounded-lg border border-[#dbe6f5] bg-white px-3 text-xs font-bold">
+                              <option value="immo">Crédit immobilier</option>
+                              <option value="auto">Crédit automobile</option>
+                              <option value="conso">Crédit consommation</option>
+                              <option value="decouvert">Découvert bancaire</option>
+                              <option value="mutuelle">Crédit mutuelle</option>
+                              <option value="autre">Autre</option>
+                            </select>
+                            <input type="text" inputmode="numeric" autocomplete="off"
+                                   :value="fmtIn(c.monthly_payment)"
+                                   @input.debounce.400ms="onAmountInput(c, 'monthly_payment', $event)"
+                                   placeholder="Mensualité FCFA"
+                                   class="min-h-10 rounded-lg border border-[#dbe6f5] bg-white px-3 text-xs font-bold">
+                            <button type="button" @click="removeCredit(idx)" class="grid h-9 w-9 place-items-center rounded-lg bg-red-50 text-red-600">
+                              <i class="fa-solid fa-trash"></i>
+                            </button>
+                          </div>
+                        </template>
+                        <p x-show="form.credits.length === 0" class="rounded-xl bg-[#f7faff] p-3 text-center text-xs font-bold text-[#8794aa]">Aucun crédit en cours</p>
+                      </div>
+                    </div>
+
+                    {# Projet immobilier #}
+                    <div class="mt-6 border-t border-[#edf2fb] pt-5">
+                      <h4 class="mb-3 text-sm font-black text-[#06194a]"><i class="fa-solid fa-house text-[#0b55d9]"></i> Mon projet immobilier</h4>
+                      <div class="grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <label class="mb-1 block text-xs font-black uppercase text-[#536484]">Montant du bien</label>
+                          <input type="text" inputmode="numeric" autocomplete="off"
+                                 :value="fmtIn(form.project_amount)"
+                                 @input.debounce.400ms="onAmountInput('form', 'project_amount', $event)"
+                                 placeholder="Ex. 30 000 000"
+                                 class="min-h-10 w-full rounded-lg border border-[#dbe6f5] bg-white px-3 text-xs font-bold">
+                        </div>
+                        <div>
+                          <label class="mb-1 block text-xs font-black uppercase text-[#536484]">Apport personnel</label>
+                          <input type="text" inputmode="numeric" autocomplete="off"
+                                 :value="fmtIn(form.personal_deposit)"
+                                 @input.debounce.400ms="onAmountInput('form', 'personal_deposit', $event)"
+                                 placeholder="Ex. 5 000 000"
+                                 class="min-h-10 w-full rounded-lg border border-[#dbe6f5] bg-white px-3 text-xs font-bold">
+                        </div>
+                        <div>
+                          <label class="mb-1 block text-xs font-black uppercase text-[#536484]">Durée souhaitée</label>
+                          <select x-model.number="form.duration_months" @change="run()" class="min-h-10 w-full rounded-lg border border-[#dbe6f5] bg-white px-3 text-xs font-bold">
+                            <option :value="60">5 ans</option>
+                            <option :value="120">10 ans</option>
+                            <option :value="180">15 ans</option>
+                            <option :value="240">20 ans (défaut)</option>
+                            <option :value="300">25 ans</option>
+                            <option :value="360">30 ans</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label class="mb-1 block text-xs font-black uppercase text-[#536484]">Banque partenaire</label>
+                          <select x-model="form.bank_id" @change="run()" class="min-h-10 w-full rounded-lg border border-[#dbe6f5] bg-white px-3 text-xs font-bold">
+                            <option value="">— Saisie manuelle —</option>
+                            <template x-for="b in banks" :key="b.id">
+                              <option :value="b.id" x-text="b.name + (b.rate ? ' · ' + b.rate + ' %' : '')"></option>
+                            </template>
+                          </select>
+                        </div>
+                        <div class="sm:col-span-2" x-show="!form.bank_id">
+                          <label class="mb-1 block text-xs font-black uppercase text-[#536484]">Taux annuel manuel (%)</label>
+                          <input type="number" min="0" max="30" step="0.1" x-model.number="form.annual_rate" @input.debounce.400ms="run()"
+                                 placeholder="Ex. 7.5"
+                                 class="min-h-10 w-full rounded-lg border border-[#dbe6f5] bg-white px-3 text-xs font-bold">
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="mt-6 flex flex-wrap gap-3">
+                      <button type="button" @click="reset()" class="rounded-xl border border-[#dce7f6] bg-white px-4 py-2 text-xs font-black text-[#06194a]"><i class="fa-solid fa-rotate-left"></i> Réinitialiser</button>
+                    </div>
+                    <p x-show="error" x-cloak class="mt-3 rounded-xl bg-red-50 p-3 text-xs font-bold text-red-700" x-text="error"></p>
+                  </div>
+
+                  {# ========== COLONNE DROITE : DASHBOARD ========== #}
+                  <div class="grid gap-5">
+                    <template x-if="!result">
+                      <div class="rounded-[28px] border-2 border-dashed border-[#dbe6f5] bg-white/60 p-10 text-center">
+                        <i class="fa-solid fa-chart-line text-5xl text-[#0b55d9]"></i>
+                        <p class="mt-4 text-lg font-black text-[#06194a]">Saisissez votre salaire net pour démarrer</p>
+                        <p class="mt-2 text-sm font-semibold text-[#536484]">Le dashboard se met à jour en temps réel à chaque modification.</p>
+                      </div>
+                    </template>
+
+                    <template x-if="result">
+                      <div class="grid gap-5">
+                        {# 4 KPI CARDS #}
+                        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                          <article class="rounded-2xl border border-[#e5edf8] bg-white p-5 shadow-sm">
+                            <div class="flex items-center justify-between">
+                              <span class="grid h-10 w-10 place-items-center rounded-xl bg-[#eaf2ff] text-lg text-[#0b55d9]"><i class="fa-solid fa-scale-balanced"></i></span>
+                              <span class="rounded-full bg-[#eaf2ff] px-2 py-0.5 text-[10px] font-black text-[#0b55d9]" x-text="result.quotite_rate + ' %'"></span>
+                            </div>
+                            <p class="mt-3 text-[10px] font-black uppercase text-[#667899]">Quotité cessible</p>
+                            <b class="mt-1 block text-2xl font-black text-[#06194a]" x-text="fmt(result.quotite_cessible)"></b>
+                            <small class="text-[10px] font-bold text-[#536484]">FCFA</small>
+                          </article>
+                          <article class="rounded-2xl border border-[#e5edf8] bg-white p-5 shadow-sm">
+                            <div class="flex items-center justify-between">
+                              <span class="grid h-10 w-10 place-items-center rounded-xl bg-[#e8fff2] text-lg text-[#0aa25f]"><i class="fa-solid fa-piggy-bank"></i></span>
+                            </div>
+                            <p class="mt-3 text-[10px] font-black uppercase text-[#667899]">Quotité disponible</p>
+                            <b class="mt-1 block text-2xl font-black text-[#06194a]" x-text="fmt(result.quotite_available)"></b>
+                            <small class="text-[10px] font-bold text-[#536484]">après crédits actuels</small>
+                          </article>
+                          <article class="rounded-2xl border border-[#e5edf8] bg-white p-5 shadow-sm">
+                            <div class="flex items-center justify-between">
+                              <span class="grid h-10 w-10 place-items-center rounded-xl bg-[#ede9fe] text-lg text-[#7c3aed]"><i class="fa-solid fa-house-circle-check"></i></span>
+                            </div>
+                            <p class="mt-3 text-[10px] font-black uppercase text-[#667899]">Montant finançable</p>
+                            <b class="mt-1 block text-2xl font-black text-[#06194a]" x-text="fmt(result.max_finance)"></b>
+                            <small class="text-[10px] font-bold text-[#536484]" x-text="'sur ' + (result.duration_months/12) + ' ans @ ' + result.effective_rate + '%'"></small>
+                          </article>
+                          <article class="rounded-2xl bg-gradient-to-br from-[#06194a] to-[#003b98] p-5 text-white shadow-2xl shadow-blue-950/20">
+                            <div class="flex items-center justify-between">
+                              <span class="grid h-10 w-10 place-items-center rounded-xl bg-white/15 text-lg text-[#caff3d]"><i class="fa-solid fa-house-chimney-user"></i></span>
+                            </div>
+                            <p class="mt-3 text-[10px] font-black uppercase text-white/70">Reste à vivre</p>
+                            <b class="mt-1 block text-2xl font-black text-white" x-text="fmt(result.living_remainder)"></b>
+                            <small class="text-[10px] font-bold text-white/70">FCFA après charges &amp; crédits</small>
+                          </article>
+                        </div>
+
+                        {# DÉCISION #}
+                        <div class="rounded-2xl p-5 text-white shadow-xl"
+                             :class="{
+                               'bg-gradient-to-br from-[#0aa25f] to-[#0b9f5b] shadow-emerald-900/20': result.decision==='eligible',
+                               'bg-gradient-to-br from-[#f59e0b] to-[#b97900] shadow-amber-900/20': result.decision==='conditional',
+                               'bg-gradient-to-br from-[#c93838] to-[#991b1b] shadow-red-900/20': result.decision==='rejected',
+                               'bg-gradient-to-br from-[#7c3aed] to-[#5b21b6] shadow-purple-900/20': result.decision==='info'
+                             }">
+                          <div class="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <span class="text-xs font-black uppercase text-white/80">Décision automatique</span>
+                              <b class="mt-1 block text-2xl font-black" x-text="result.decision_label"></b>
+                            </div>
+                            <i class="fa-solid text-4xl" :class="{
+                              'fa-circle-check': result.decision==='eligible',
+                              'fa-triangle-exclamation': result.decision==='conditional',
+                              'fa-circle-xmark': result.decision==='rejected',
+                              'fa-circle-info': result.decision==='info'
+                            }"></i>
+                          </div>
+                        </div>
+
+                        {# JAUGE QUOTITÉ + GRAPHIQUE #}
+                        <div class="grid gap-5 md:grid-cols-2">
+                          <div class="rounded-2xl border border-[#e5edf8] bg-white p-5 shadow-sm">
+                            <h4 class="text-sm font-black text-[#06194a]"><i class="fa-solid fa-gauge-high text-[#0b55d9]"></i> Tranche officielle CI</h4>
+                            <div class="mt-4">
+                              <div class="flex items-baseline justify-between text-xs font-black text-[#536484]">
+                                <span>0 %</span><span class="text-base text-[#0b55d9]" x-text="result.quotite_rate + ' %'"></span><span>57 %</span>
+                              </div>
+                              <div class="relative mt-2 h-4 w-full overflow-hidden rounded-full bg-[#eef3fb]">
+                                <div class="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-[#0b55d9] via-[#7c3aed] to-[#0aa25f] transition-all duration-500"
+                                     :style="'width:' + result.gauge.position_pct + '%'"></div>
+                                <div class="absolute top-0 h-full w-1 bg-[#06194a]"
+                                     :style="'left:' + result.gauge.position_pct + '%'"></div>
+                              </div>
+                              <p class="mt-3 text-xs font-bold text-[#536484]" x-text="result.quotite_bracket_label"></p>
+                            </div>
+                          </div>
+                          <div class="rounded-2xl border border-[#e5edf8] bg-white p-5 shadow-sm">
+                            <h4 class="text-sm font-black text-[#06194a]"><i class="fa-solid fa-chart-pie text-[#0aa25f]"></i> Répartition</h4>
+                            <canvas id="quotiteDoughnut" class="mt-2 max-h-[200px]"></canvas>
+                          </div>
+                        </div>
+
+                        {# ANALYSE IA #}
+                        <div class="rounded-2xl border border-[#e5edf8] bg-[#f7faff] p-5">
+                          <h4 class="text-sm font-black text-[#0b55d9]"><i class="fa-solid fa-wand-magic-sparkles"></i> Analyse IA personnalisée</h4>
+                          <p class="mt-3 whitespace-pre-line text-sm font-semibold leading-6 text-[#06337d]" x-text="result.ai_text"></p>
+                        </div>
+
+                        {# COMPARATEUR BANQUES #}
+                        <div class="rounded-2xl border border-[#e5edf8] bg-white p-5 shadow-sm" x-show="result.comparator && result.comparator.rows.length" x-cloak>
+                          <h4 class="text-sm font-black text-[#06194a]"><i class="fa-solid fa-balance-scale text-[#7c3aed]"></i> Comparateur de banques partenaires</h4>
+                          <div class="mt-3 overflow-x-auto">
+                            <table class="w-full min-w-[480px] text-left text-xs">
+                              <thead class="bg-[#f7faff] text-[10px] font-black uppercase text-[#667899]">
+                                <tr><th class="px-3 py-2">Banque</th><th>Taux</th><th>Mensualité projet</th><th>Capacité max</th></tr>
+                              </thead>
+                              <tbody class="divide-y divide-[#edf2fb]">
+                                <template x-for="row in result.comparator.rows" :key="row.id">
+                                  <tr class="font-bold">
+                                    <td class="px-3 py-2"><span x-text="row.name"></span>
+                                      <template x-if="row.id === result.comparator.best_rate_id"><span class="ml-1 rounded-full bg-[#e8fff2] px-2 py-0.5 text-[10px] text-[#0b9f5b]">★ Meilleur taux</span></template>
+                                    </td>
+                                    <td><span x-text="row.rate + ' %'"></span></td>
+                                    <td>
+                                      <span x-text="row.payment_for_target > 0 ? fmt(row.payment_for_target) + ' FCFA' : '—'"></span>
+                                      <template x-if="row.id === result.comparator.best_payment_id"><span class="ml-1 rounded-full bg-[#eaf2ff] px-2 py-0.5 text-[10px] text-[#0b55d9]">↓ Plus faible</span></template>
+                                    </td>
+                                    <td>
+                                      <span x-text="fmt(row.max_finance) + ' FCFA'"></span>
+                                      <template x-if="row.id === result.comparator.best_finance_id"><span class="ml-1 rounded-full bg-[#ede9fe] px-2 py-0.5 text-[10px] text-[#7c3aed]">↑ Capacité max</span></template>
+                                    </td>
+                                  </tr>
+                                </template>
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+
+                        {# 3 CTAs #}
+                        <div class="grid gap-3 sm:grid-cols-3">
+                          <a href="{% url 'public-mutuelle-signup' %}" class="rounded-2xl bg-[#0b55d9] px-4 py-3 text-center text-sm font-black text-white no-underline shadow-lg shadow-blue-900/20"><i class="fa-solid fa-rocket"></i> Créer mon dossier</a>
+                          <button type="button" @click="contactModalOpen=true" class="rounded-2xl bg-[#0aa25f] px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/20"><i class="fa-solid fa-phone"></i> Être rappelé</button>
+                          <a href="#projets" class="rounded-2xl bg-[#7c3aed] px-4 py-3 text-center text-sm font-black text-white no-underline shadow-lg shadow-purple-900/20"><i class="fa-solid fa-handshake"></i> Comparer les offres</a>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+
+                {# ===== ONGLET 2 — SIMULATEUR DE CRÉDIT IMMOBILIER ===== #}
+                <div x-show="activeTab==='credit'" x-transition.opacity class="grid gap-6 xl:grid-cols-[1fr_1fr]">
+
+                  {# Formulaire crédit #}
+                  <div class="rounded-[28px] border border-[#e5edf8] bg-white p-7 shadow-xl shadow-blue-950/5">
+                    <h3 class="text-xl font-black text-[#06194a]"><i class="fa-solid fa-sliders text-[#0b55d9]"></i> Paramètres du crédit</h3>
+                    <form @submit.prevent="runCredit()" class="mt-6 grid gap-5">
+                      <div>
+                        <label class="mb-1 block text-xs font-black uppercase text-[#536484]">Montant emprunté (FCFA) <span class="text-red-500">*</span></label>
+                        <input type="text" inputmode="numeric" autocomplete="off"
+                               :value="fmtIn(credit.amount)"
+                               @input.debounce.400ms="onAmountInput(credit, 'amount', $event); runCredit()"
+                               placeholder="Ex. 25 000 000"
+                               class="min-h-12 w-full rounded-xl border-2 border-[#0b55d9] bg-white px-4 text-base font-black text-[#06194a] outline-none">
+                      </div>
+
                       <div>
                         <label class="mb-1 flex items-center justify-between text-xs font-black uppercase text-[#536484]">
-                          <span><i class="fa-solid fa-building-columns"></i> Banque (Partenaires)</span>
+                          <span><i class="fa-solid fa-building-columns"></i> Banque (optionnel)</span>
                           <span x-show="credit.bank_id" x-cloak class="rounded-full bg-[#e8fff2] px-2 py-0.5 text-[10px] text-[#0b9f5b]">Taux appliqué</span>
                         </label>
-                        <select x-model="credit.bank_id" @change="applyBankRate('credit')"
+                        <select x-model="credit.bank_id" @change="applyCreditBank(); runCredit()"
                                 class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#0b55d9]">
                           <option value="">— Saisie manuelle du taux —</option>
                           <template x-for="b in banks" :key="b.id">
@@ -277,29 +644,33 @@
                           </template>
                         </select>
                       </div>
+
                       <div class="grid gap-4 sm:grid-cols-2">
                         <div>
                           <label class="mb-1 block text-xs font-black uppercase text-[#536484]">Taux annuel (%)</label>
                           <input type="number" min="0" max="50" step="0.1" x-model.number="credit.rate"
                                  :disabled="!!credit.bank_id"
                                  :class="credit.bank_id ? 'cursor-not-allowed bg-[#f7faff] text-[#536484]' : ''"
+                                 @input.debounce.400ms="runCredit()"
                                  placeholder="Ex. 7,5"
                                  class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#0b55d9]">
                         </div>
                         <div>
-                          <label class="mb-1 block text-xs font-black uppercase text-[#536484]">Durée (mois)</label>
-                          <input type="number" min="1" max="480" step="1" x-model.number="credit.months"
-                                 placeholder="Ex. 240 (20 ans)"
-                                 class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#0b55d9]">
+                          <label class="mb-1 block text-xs font-black uppercase text-[#536484]">Durée</label>
+                          <select x-model.number="credit.months" @change="runCredit()"
+                                  class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#0b55d9]">
+                            <option :value="60">5 ans</option>
+                            <option :value="120">10 ans</option>
+                            <option :value="180">15 ans</option>
+                            <option :value="240">20 ans (défaut)</option>
+                            <option :value="300">25 ans</option>
+                            <option :value="360">30 ans</option>
+                          </select>
                         </div>
                       </div>
+
                       <div class="flex flex-wrap gap-3">
-                        <button type="submit" :disabled="credit.loading"
-                                class="rounded-2xl bg-[#0b55d9] px-6 py-3 text-sm font-black text-white shadow-lg shadow-blue-900/20 disabled:opacity-60">
-                          <i class="fa-solid" :class="credit.loading ? 'fa-spinner fa-spin' : 'fa-calculator'"></i>
-                          <span x-text="credit.loading ? 'Calcul…' : 'Calculer'"></span>
-                        </button>
-                        <button type="button" @click="resetCredit()" class="rounded-2xl border border-[#dce7f6] bg-white px-6 py-3 text-sm font-black text-[#06194a]">Réinitialiser</button>
+                        <button type="button" @click="resetCredit()" class="rounded-xl border border-[#dce7f6] bg-white px-4 py-2 text-xs font-black text-[#06194a]"><i class="fa-solid fa-rotate-left"></i> Réinitialiser</button>
                       </div>
                       <p x-show="credit.error" x-cloak class="rounded-xl bg-red-50 p-3 text-xs font-bold text-red-700" x-text="credit.error"></p>
                     </form>
@@ -307,7 +678,7 @@
 
                   {# Résultats crédit #}
                   <div class="rounded-[28px] bg-gradient-to-br from-[#06194a] to-[#003b98] p-7 text-white shadow-2xl shadow-blue-950/20">
-                    <h3 class="text-xl font-black"><i class="fa-solid fa-chart-line text-[#caff3d]"></i> Résultat</h3>
+                    <h3 class="text-xl font-black"><i class="fa-solid fa-chart-line text-[#caff3d]"></i> Votre crédit</h3>
                     <template x-if="credit.result">
                       <div class="mt-5 grid gap-4">
                         <div class="rounded-2xl bg-white/10 p-5">
@@ -324,172 +695,20 @@
                             <b class="mt-1 block text-xl text-[#cfff3d]" x-text="fmt(credit.result.total_interest) + ' FCFA'"></b>
                           </div>
                         </div>
-                        <p class="mt-1 text-xs font-bold text-white/60">
-                          Sur <span x-text="credit.result.months"></span> mois (<span x-text="credit.result.years"></span> ans)
-                          au taux annuel de <span x-text="credit.result.rate"></span>%.
+                        <p class="text-xs font-bold text-white/70">
+                          Sur <span x-text="credit.result.months"></span> mois
+                          (<span x-text="credit.result.years"></span> ans) au taux annuel de
+                          <span x-text="credit.result.rate"></span> %.
                         </p>
+                        <div class="grid gap-3 sm:grid-cols-2 pt-2">
+                          <a href="{% url 'public-mutuelle-signup' %}" class="rounded-xl bg-[#caff3d] px-4 py-3 text-center text-sm font-black text-[#06194a] no-underline"><i class="fa-solid fa-rocket"></i> Constituer mon dossier</a>
+                          <button type="button" @click="contactModalOpen=true" class="rounded-xl border border-white/30 px-4 py-3 text-sm font-black text-white"><i class="fa-solid fa-phone"></i> Être rappelé</button>
+                        </div>
                       </div>
                     </template>
                     <template x-if="!credit.result">
-                      <p class="mt-5 rounded-2xl bg-white/10 p-6 text-center text-sm font-bold text-white/70">
-                        <i class="fa-solid fa-arrow-left"></i> Remplissez les paramètres et cliquez sur Calculer.
-                      </p>
-                    </template>
-                  </div>
-                </div>
-
-                {# ===== ONGLET QUOTITÉ ===== #}
-                <div x-show="tab==='quotite'" x-transition.opacity class="mt-6 grid gap-6 xl:grid-cols-[1fr_1fr]">
-                  <div class="rounded-[28px] border border-[#e5edf8] bg-white p-7 shadow-sm">
-                    <h3 class="text-xl font-black"><i class="fa-solid fa-scale-balanced text-[#7c3aed]"></i> Votre situation financière</h3>
-                    <form @submit.prevent="runQuotite()" class="mt-5 grid gap-4">
-                      <div class="grid gap-4 sm:grid-cols-2">
-                        <div>
-                          <label class="mb-1 block text-xs font-black uppercase text-[#536484]">Revenu net mensuel (FCFA)</label>
-                          <input type="number" min="0" step="10000" x-model.number="quotite.net_salary"
-                                 placeholder="Ex. 600 000"
-                                 class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#7c3aed]">
-                        </div>
-                        <div>
-                          <label class="mb-1 block text-xs font-black uppercase text-[#536484]">Revenus complémentaires</label>
-                          <input type="number" min="0" step="10000" x-model.number="quotite.complementary_income"
-                                 placeholder="Optionnel"
-                                 class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#7c3aed]">
-                        </div>
-                        <div>
-                          <label class="mb-1 block text-xs font-black uppercase text-[#536484]">Charges fixes mensuelles</label>
-                          <input type="number" min="0" step="10000" x-model.number="quotite.fixed_charges"
-                                 placeholder="Ex. 150 000"
-                                 class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#7c3aed]">
-                        </div>
-                        <div>
-                          <label class="mb-1 block text-xs font-black uppercase text-[#536484]">Prêts en cours (mensualité)</label>
-                          <input type="number" min="0" step="5000" x-model.number="quotite.existing_loans"
-                                 placeholder="0 si aucun"
-                                 class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#7c3aed]">
-                        </div>
-                      </div>
-
-                      <div>
-                        <label class="mb-1 flex items-center justify-between text-xs font-black uppercase text-[#536484]">
-                          <span><i class="fa-solid fa-building-columns"></i> Banque (optionnel — auto-remplit le taux)</span>
-                          <span x-show="quotite.bank_id" x-cloak class="rounded-full bg-[#e8fff2] px-2 py-0.5 text-[10px] text-[#0b9f5b]">Taux appliqué</span>
-                        </label>
-                        <select x-model="quotite.bank_id" @change="applyBankRate('quotite')"
-                                class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#7c3aed]">
-                          <option value="">— Saisie manuelle du taux —</option>
-                          <template x-for="b in banks" :key="b.id">
-                            <option :value="b.id" x-text="b.name + (b.rate ? ' · ' + b.rate + ' %' : '')"></option>
-                          </template>
-                        </select>
-                      </div>
-
-                      <div class="grid gap-4 sm:grid-cols-3">
-                        <div>
-                          <label class="mb-1 block text-xs font-black uppercase text-[#536484]">Taux endettement max (%)</label>
-                          <input type="number" min="1" max="100" step="1" x-model.number="quotite.max_debt_ratio"
-                                 placeholder="33 (norme UEMOA)"
-                                 class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#7c3aed]">
-                        </div>
-                        <div>
-                          <label class="mb-1 block text-xs font-black uppercase text-[#536484]">Taux annuel (%)</label>
-                          <input type="number" min="0" max="50" step="0.1" x-model.number="quotite.annual_rate"
-                                 :disabled="!!quotite.bank_id"
-                                 :class="quotite.bank_id ? 'cursor-not-allowed bg-[#f7faff] text-[#536484]' : ''"
-                                 placeholder="Ex. 7,5"
-                                 class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#7c3aed]">
-                        </div>
-                        <div>
-                          <label class="mb-1 block text-xs font-black uppercase text-[#536484]">Durée envisagée (mois)</label>
-                          <input type="number" min="1" max="480" step="1" x-model.number="quotite.duration_months"
-                                 placeholder="Ex. 180 (15 ans)"
-                                 class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#7c3aed]">
-                        </div>
-                      </div>
-
-                      <div>
-                        <label class="mb-1 block text-xs font-black uppercase text-[#536484]">Montant souhaité (facultatif)</label>
-                        <input type="number" min="0" step="100000" x-model.number="quotite.requested_amount"
-                               placeholder="Ex. 30 000 000"
-                               class="min-h-12 w-full rounded-xl border border-[#dbe6f5] bg-white px-4 text-sm font-bold outline-none focus:border-[#7c3aed]">
-                      </div>
-
-                      <div class="flex flex-wrap gap-3">
-                        <button type="submit" :disabled="quotite.loading"
-                                class="rounded-2xl bg-[#7c3aed] px-6 py-3 text-sm font-black text-white shadow-lg shadow-purple-900/20 disabled:opacity-60">
-                          <i class="fa-solid" :class="quotite.loading ? 'fa-spinner fa-spin' : 'fa-gauge-high'"></i>
-                          <span x-text="quotite.loading ? 'Calcul…' : 'Calculer ma quotité'"></span>
-                        </button>
-                        <button type="button" @click="resetQuotite()" class="rounded-2xl border border-[#dce7f6] bg-white px-6 py-3 text-sm font-black text-[#06194a]">Réinitialiser</button>
-                      </div>
-                      <p x-show="quotite.error" x-cloak class="rounded-xl bg-red-50 p-3 text-xs font-bold text-red-700" x-text="quotite.error"></p>
-                    </form>
-                  </div>
-
-                  {# Résultats quotité #}
-                  <div class="rounded-[28px] bg-gradient-to-br from-[#06194a] to-[#003b98] p-7 text-white shadow-2xl shadow-blue-950/20">
-                    <h3 class="text-xl font-black"><i class="fa-solid fa-chart-pie text-[#caff3d]"></i> Votre capacité</h3>
-                    <template x-if="quotite.result">
-                      <div class="mt-5 grid gap-4">
-                        <div class="rounded-2xl p-5"
-                             :class="{
-                               'bg-[#0aa25f]': quotite.result.decision==='eligible',
-                               'bg-[#b97900]': quotite.result.decision==='conditional',
-                               'bg-[#c93838]': quotite.result.decision==='rejected',
-                               'bg-white/10': quotite.result.decision==='info'
-                             }">
-                          <span class="text-xs font-black uppercase text-white/80">Décision</span>
-                          <b class="mt-1 block text-2xl font-black" x-text="quotite.result.decision_label"></b>
-                          <small class="block text-xs font-bold text-white/80">Taux endettement : <span x-text="quotite.result.debt_ratio.toFixed(1)"></span>%</small>
-                        </div>
-
-                        <div class="grid gap-3 sm:grid-cols-2">
-                          <div class="rounded-2xl bg-white/10 p-4">
-                            <span class="text-xs font-black uppercase text-white/70">Mensualité max autorisée</span>
-                            <b class="mt-1 block text-lg text-[#caff3d]" x-text="fmt(quotite.result.max_authorized) + ' FCFA'"></b>
-                          </div>
-                          <div class="rounded-2xl bg-white/10 p-4">
-                            <span class="text-xs font-black uppercase text-white/70">Capacité nette</span>
-                            <b class="mt-1 block text-lg" x-text="fmt(quotite.result.net_capacity) + ' FCFA'"></b>
-                          </div>
-                          <div class="rounded-2xl bg-white/10 p-4">
-                            <span class="text-xs font-black uppercase text-white/70">Montant finançable</span>
-                            <b class="mt-1 block text-lg text-[#cfff3d]" x-text="fmt(quotite.result.max_finance) + ' FCFA'"></b>
-                          </div>
-                          <div class="rounded-2xl bg-white/10 p-4">
-                            <span class="text-xs font-black uppercase text-white/70">Reste à vivre</span>
-                            <b class="mt-1 block text-lg" x-text="fmt(quotite.result.living_remainder) + ' FCFA'"></b>
-                          </div>
-                        </div>
-
-                        <template x-if="quotite.result.requested_amount > 0">
-                          <div class="rounded-2xl bg-white/10 p-4">
-                            <span class="text-xs font-black uppercase text-white/70">Mensualité estimée pour <span x-text="fmt(quotite.result.requested_amount)"></span> FCFA</span>
-                            <b class="mt-1 block text-xl" x-text="fmt(quotite.result.estimated_payment) + ' FCFA'"></b>
-                          </div>
-                        </template>
-
-                        <template x-if="quotite.result.recommendations.length">
-                          <div class="rounded-2xl bg-[#caff3d]/15 p-4">
-                            <span class="text-xs font-black uppercase text-[#cfff3d]"><i class="fa-solid fa-lightbulb"></i> Recommandations</span>
-                            <ul class="mt-2 grid gap-1 text-xs font-bold text-white">
-                              <template x-for="rec in quotite.result.recommendations" :key="rec">
-                                <li class="flex items-start gap-2"><i class="fa-solid fa-arrow-right mt-1 text-[#caff3d]"></i><span x-text="rec"></span></li>
-                              </template>
-                            </ul>
-                          </div>
-                        </template>
-
-                        <p class="text-xs font-bold text-white/60">
-                          Pour une simulation détaillée et personnalisée par votre mutuelle,
-                          <a href="{% url 'public-mutuelle-signup' %}" class="text-[#caff3d] underline">créez votre espace</a> ou
-                          <button type="button" @click="contactModalOpen=true" class="text-[#caff3d] underline">contactez-nous</button>.
-                        </p>
-                      </div>
-                    </template>
-                    <template x-if="!quotite.result">
-                      <p class="mt-5 rounded-2xl bg-white/10 p-6 text-center text-sm font-bold text-white/70">
-                        <i class="fa-solid fa-arrow-left"></i> Saisissez vos revenus et charges pour obtenir votre capacité d'emprunt.
+                      <p class="mt-6 rounded-2xl bg-white/10 p-6 text-center text-sm font-bold text-white/70">
+                        <i class="fa-solid fa-arrow-left"></i> Saisissez le montant emprunté pour obtenir votre mensualité.
                       </p>
                     </template>
                   </div>
@@ -531,50 +750,6 @@
                             <h3 class="mt-5 font-black">Décision assistée IA</h3>
                             <p class="mt-2 text-sm font-semibold leading-6 text-white/70">Synthèses comité, notes banque
                                 et détection des incohérences.</p></div>
-                    </div>
-                </div>
-            </section>
-
-            <section id="quotite" class="bg-[#06194a]">
-                <div class="mx-auto grid max-w-[1320px] gap-10 px-5 py-20 text-white lg:grid-cols-[.9fr_1.1fr] lg:px-8">
-                    <div>
-                        <span class="text-xs font-black uppercase tracking-[.16em] text-[#caff3d]">Quotité cessible</span>
-                        <h2 class="mt-4 text-4xl font-black leading-tight md:text-5xl">La décision ne part plus d’une
-                            intuition, mais d’une capacité réelle.</h2>
-                        <p class="mt-5 text-lg leading-8 text-white/70">DGA-Mutuelle calcule la mensualité maximale par
-                            membre, puis consolide la capacité de toute la mutuelle pour dimensionner un programme
-                            immobilier collectif.</p>
-                        {% if user.is_authenticated %}
-                            <a href="{% url 'create-simulation' %}"
-                               class="mt-8 inline-flex rounded-2xl bg-[#caff3d] px-6 py-4 text-sm font-black text-[#06194a] no-underline">Lancer
-                                une simulation</a>
-                        {% else %}
-                            <a href="{% url 'login' %}?next=/console/simulations/nouvelle/"
-                               class="mt-8 inline-flex rounded-2xl bg-[#caff3d] px-6 py-4 text-sm font-black text-[#06194a] no-underline">Lancer
-                                une simulation</a>
-                        {% endif %}
-                    </div>
-                    <div class="grid gap-4 md:grid-cols-2">
-                        <div class="rounded-3xl bg-white/10 p-6"><span
-                                class="text-xs font-black uppercase text-white/50">Membre</span><b
-                                class="mt-4 block text-3xl">150 000 000 FCFA</b>
-                            <p class="mt-2 text-sm font-bold text-white/70">Montant maximal estimé selon revenus,
-                                charges, crédits et reste à vivre.</p></div>
-                        <div class="rounded-3xl bg-white p-6 text-[#06194a]"><span
-                                class="text-xs font-black uppercase text-[#536484]">Mutuelle</span><b
-                                class="mt-4 block text-3xl">3,25 Md FCFA</b>
-                            <p class="mt-2 text-sm font-bold text-[#536484]">Capacité d’emprunt collective pour
-                                négociation bancaire.</p></div>
-                        <div class="rounded-3xl bg-[#caff3d] p-6 text-[#06194a]"><span
-                                class="text-xs font-black uppercase text-[#31430b]">Risque</span><b
-                                class="mt-4 block text-3xl">78/100</b>
-                            <p class="mt-2 text-sm font-bold text-[#31430b]">Score global basé sur la régularité, KYC,
-                                solvabilité et historique.</p></div>
-                        <div class="rounded-3xl bg-white/10 p-6"><span
-                                class="text-xs font-black uppercase text-white/50">Amortissement</span><b
-                                class="mt-4 block text-3xl">120 mois</b>
-                            <p class="mt-2 text-sm font-bold text-white/70">Période d’amortissement moyenne suivie par
-                                membre et par mutuelle.</p></div>
                     </div>
                 </div>
             </section>
@@ -930,124 +1105,288 @@
     </div>
 
 
-    <script>
-      function publicSimulator() {
-        const csrf = document.querySelector('input[name=csrfmiddlewaretoken]')?.value || '';
-        function fmt(n) {
-          if (n === null || n === undefined || isNaN(n)) return '—';
-          return Math.round(Number(n)).toLocaleString('fr-FR');
+  <script>
+  // =====================================================================
+  // Assistant Quotité Cessible — barème Côte d'Ivoire, calcul AJAX,
+  // persistance localStorage, jauge + doughnut chart, comparateur banques.
+  // =====================================================================
+  function quotiteCessibleAssistant() {
+    const STORAGE_KEY = 'mutuellex.quotite.v2';
+    function fmt(n) {
+      if (n === null || n === undefined || isNaN(n)) return '—';
+      return Math.round(Number(n)).toLocaleString('fr-FR');
+    }
+    function getCSRF() {
+      const m = document.cookie.match(/csrftoken=([^;]+)/);
+      if (m) return m[1];
+      const el = document.querySelector('input[name=csrfmiddlewaretoken]');
+      return el ? el.value : '';
+    }
+    function quotiteRateCI(salary) {
+      if (salary <= 0) return 0;
+      if (salary <= 200000) return 35;
+      if (salary <= 400000) return 38;
+      if (salary <= 600000) return 42;
+      if (salary <= 800000) return 45;
+      if (salary <= 1000000) return 48;
+      if (salary <= 1500000) return 52;
+      if (salary <= 2000000) return 55;
+      return 57;
+    }
+
+    const defaultForm = () => ({
+      net_salary: null,
+      revenues: [],
+      charges: [],
+      credits: [],
+      project_amount: null,
+      personal_deposit: null,
+      duration_months: 240,
+      annual_rate: 7.5,
+      bank_id: '',
+    });
+
+    // Format d'affichage : "800 000". null/0/"" → "".
+    function fmtIn(n) {
+      if (n === null || n === undefined || n === '' || isNaN(Number(n))) return '';
+      return Number(n).toLocaleString('fr-FR');
+    }
+    // Parse retour : enlève espaces / virgules françaises → Number ou null.
+    function parseIn(str) {
+      if (str === null || str === undefined) return null;
+      const cleaned = String(str).replace(/[\s ]/g, '').replace(',', '.');
+      if (!cleaned) return null;
+      const n = Number(cleaned);
+      return isNaN(n) ? null : n;
+    }
+
+    return {
+      activeTab: 'quotite',
+      form: defaultForm(),
+      banks: [],
+      result: null,
+      error: '',
+      loading: false,
+      _chart: null,
+      // --- Crédit immobilier (onglet 2) ---
+      credit: {
+        amount: null,
+        rate: null,
+        months: 240,
+        bank_id: '',
+        loading: false,
+        error: '',
+        result: null,
+      },
+      fmt, fmtIn, parseIn,
+
+      // ---------- CRÉDIT : auto-fill banque + run + reset ----------
+      applyCreditBank() {
+        const id = this.credit.bank_id;
+        if (!id) return;
+        const bank = this.banks.find(b => b.id === id);
+        if (bank && bank.rate !== null && bank.rate !== undefined) {
+          this.credit.rate = bank.rate;
+          if (bank.max_months && this.credit.months > bank.max_months) {
+            this.credit.months = bank.max_months;
+          }
         }
-        async function postJSON(url, data) {
+      },
+      async runCredit() {
+        this.credit.error = '';
+        const amount = Number(this.credit.amount || 0);
+        const rate = Number(this.credit.rate || 0);
+        const months = Number(this.credit.months || 0);
+        if (amount <= 0) { this.credit.result = null; return; }
+        if (rate < 0 || rate > 50) { this.credit.error = 'Taux annuel invalide.'; return; }
+        if (months <= 0) { this.credit.error = 'Durée invalide.'; return; }
+        this.credit.loading = true;
+        try {
           const body = new URLSearchParams();
-          for (const [k, v] of Object.entries(data)) body.append(k, v);
-          const resp = await fetch(url, {
+          body.append('amount', amount);
+          body.append('rate', rate);
+          body.append('months', months);
+          const resp = await fetch("{% url 'public-simulate-credit' %}", {
             method: 'POST',
             headers: {
-              'X-CSRFToken': csrf,
+              'X-CSRFToken': getCSRF(),
               'X-Requested-With': 'XMLHttpRequest',
               'Content-Type': 'application/x-www-form-urlencoded',
             },
             body: body.toString(),
             credentials: 'same-origin',
           });
-          return resp.json();
+          const data = await resp.json();
+          if (!data.ok) { this.credit.error = data.error || 'Erreur de calcul.'; this.credit.result = null; }
+          else { this.credit.result = data; }
+        } catch (e) {
+          this.credit.error = 'Erreur réseau. Réessayez.';
+        } finally {
+          this.credit.loading = false;
         }
+      },
+      resetCredit() {
+        this.credit = { amount: null, rate: null, months: 240, bank_id: '', loading: false, error: '', result: null };
+      },
+      // Helpers : pose la valeur formattée et met à jour le state
+      onAmountInput(target, key, ev) {
+        const cleaned = String(ev.target.value).replace(/[\s ]/g, '').replace(',', '.');
+        // Curseur basique : on garde la valeur clean côté form, on reformatte côté affichage
+        const num = cleaned === '' ? null : Number(cleaned);
+        const val = (num === null || isNaN(num)) ? null : num;
+        if (target === 'form') this.form[key] = val;
+        else target[key] = val;
+        // Reformatte l'input pour afficher les séparateurs
+        ev.target.value = fmtIn(val);
+        this.run();
+      },
 
-        return {
-          tab: 'credit',
-          fmt,
-          banks: [],
-          // Init : charge la liste des banques au mount
-          async init() {
-            try {
-              const resp = await fetch("{% url 'public-banks-list' %}", {
-                headers: { 'X-Requested-With': 'XMLHttpRequest' },
-                credentials: 'same-origin',
-              });
-              const data = await resp.json();
-              if (data.ok) this.banks = data.banks;
-            } catch (e) { /* silencieux : le simulateur reste utilisable en saisie manuelle */ }
-          },
-          // Auto-fill du taux quand l'utilisateur sélectionne une banque
-          applyBankRate(target) {
-            const id = this[target].bank_id;
-            if (!id) return;
-            const bank = this.banks.find(b => b.id === id);
-            if (bank && bank.rate !== null && bank.rate !== undefined) {
-              if (target === 'credit') {
-                this.credit.rate = bank.rate;
-                // Bornage durée si la banque a une durée max
-                if (bank.max_months && this.credit.months > bank.max_months) {
-                  this.credit.months = bank.max_months;
-                }
-              } else if (target === 'quotite') {
-                this.quotite.annual_rate = bank.rate;
-                if (bank.max_months && this.quotite.duration_months > bank.max_months) {
-                  this.quotite.duration_months = bank.max_months;
-                }
-              }
-            }
-          },
-          // ---- Crédit ---- (champs vides : l'utilisateur saisit ses propres valeurs)
-          credit: {
-            amount: null,
-            rate: null,
-            months: null,
-            bank_id: '',
-            loading: false,
-            error: '',
-            result: null,
-          },
-          async runCredit() {
-            this.credit.loading = true;
-            this.credit.error = '';
-            try {
-              const data = await postJSON("{% url 'public-simulate-credit' %}", {
-                amount: this.credit.amount, rate: this.credit.rate, months: this.credit.months,
-              });
-              if (!data.ok) { this.credit.error = data.error || 'Erreur de calcul.'; this.credit.result = null; }
-              else { this.credit.result = data; }
-            } catch (e) { this.credit.error = 'Erreur réseau. Réessayez.'; }
-            finally { this.credit.loading = false; }
-          },
-          resetCredit() {
-            this.credit = { amount: null, rate: null, months: null, bank_id: '', loading: false, error: '', result: null };
-          },
-          // ---- Quotité cessible ---- (champs vides au démarrage)
-          quotite: {
-            net_salary: null,
-            complementary_income: null,
-            fixed_charges: null,
-            existing_loans: null,
-            max_debt_ratio: null,
-            annual_rate: null,
-            duration_months: null,
-            requested_amount: null,
-            bank_id: '',
-            loading: false,
-            error: '',
-            result: null,
-          },
-          async runQuotite() {
-            this.quotite.loading = true;
-            this.quotite.error = '';
-            try {
-              const payload = { ...this.quotite };
-              delete payload.loading; delete payload.error; delete payload.result;
-              const data = await postJSON("{% url 'public-simulate-quotite' %}", payload);
-              if (!data.ok) { this.quotite.error = data.error || 'Erreur de calcul.'; this.quotite.result = null; }
-              else { this.quotite.result = data; }
-            } catch (e) { this.quotite.error = 'Erreur réseau. Réessayez.'; }
-            finally { this.quotite.loading = false; }
-          },
-          resetQuotite() {
-            this.quotite = {
-              net_salary: null, complementary_income: null, fixed_charges: null, existing_loans: null,
-              max_debt_ratio: null, annual_rate: null, duration_months: null, requested_amount: null,
-              bank_id: '', loading: false, error: '', result: null,
-            };
-          },
-        };
-      }
-    </script>
+      // ---------- INIT ----------
+      async init() {
+        // localStorage restore
+        try {
+          const saved = localStorage.getItem(STORAGE_KEY);
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            this.form = Object.assign(defaultForm(), parsed);
+          }
+        } catch (e) { /* ignore */ }
+
+        // fetch banks (catalogue)
+        try {
+          const resp = await fetch("{% url 'public-banks-list' %}", {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'same-origin',
+          });
+          const data = await resp.json();
+          if (data.ok) this.banks = data.banks;
+        } catch (e) { /* simulateur reste utilisable sans comparateur */ }
+
+        // Watcher : sauvegarde automatique + auto-run si on a déjà des données
+        this.$watch('form', () => this.persist(), { deep: true });
+        if (this.form.net_salary > 0) this.run();
+      },
+
+      persist() {
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(this.form)); } catch (e) {}
+      },
+
+      bracketLabel() {
+        const s = Number(this.form.net_salary || 0);
+        const rate = quotiteRateCI(s);
+        if (s <= 200000) return '≤ 200 000 FCFA → ' + rate + ' %';
+        if (s <= 400000) return '200 001 — 400 000 FCFA → ' + rate + ' %';
+        if (s <= 600000) return '400 001 — 600 000 FCFA → ' + rate + ' %';
+        if (s <= 800000) return '600 001 — 800 000 FCFA → ' + rate + ' %';
+        if (s <= 1000000) return '800 001 — 1 000 000 FCFA → ' + rate + ' %';
+        if (s <= 1500000) return '1 000 001 — 1 500 000 FCFA → ' + rate + ' %';
+        if (s <= 2000000) return '1 500 001 — 2 000 000 FCFA → ' + rate + ' %';
+        return '> 2 000 000 FCFA → 57 %';
+      },
+
+      // ---------- DYNAMIC ROWS ----------
+      addRevenue() { this.form.revenues.push({ type: 'prime_fonction', amount: 0 }); },
+      removeRevenue(idx) { this.form.revenues.splice(idx, 1); this.run(); },
+      addCharge() { this.form.charges.push({ type: 'loyer', amount: 0 }); },
+      removeCharge(idx) { this.form.charges.splice(idx, 1); this.run(); },
+      addCredit() { this.form.credits.push({ type: 'conso', monthly_payment: 0 }); },
+      removeCredit(idx) { this.form.credits.splice(idx, 1); this.run(); },
+
+      // ---------- RUN AJAX ----------
+      async run() {
+        this.error = '';
+        const salary = Number(this.form.net_salary || 0);
+        if (salary <= 0) { this.result = null; return; }
+        this.loading = true;
+        try {
+          const resp = await fetch("{% url 'public-simulate-quotite' %}", {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': getCSRF(),
+              'X-Requested-With': 'XMLHttpRequest',
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify(this.form),
+          });
+          const data = await resp.json();
+          if (!data.ok) { this.error = data.error || 'Erreur de calcul.'; this.result = null; }
+          else {
+            this.result = data;
+            // Petit délai pour laisser <template x-if> matérialiser le canvas
+            // (sinon Chart.js lève "Cannot read properties of null (ownerDocument)").
+            setTimeout(() => this.renderDoughnut(), 60);
+          }
+        } catch (e) {
+          this.error = 'Erreur réseau. Vérifiez votre connexion.';
+        } finally {
+          this.loading = false;
+        }
+      },
+
+      // ---------- DOUGHNUT CHART ----------
+      _doughnutRetries: 0,
+      renderDoughnut() {
+        if (!window.Chart || !this.result) return;
+        const canvas = document.getElementById('quotiteDoughnut');
+        // Garde-fou : canvas pas encore en DOM (template x-if pas matérialisé)
+        // → retry jusqu'à 5 fois (max 500 ms) avant d'abandonner silencieusement.
+        if (!canvas || !canvas.isConnected || !canvas.ownerDocument || !canvas.parentNode) {
+          if (this._doughnutRetries < 5) {
+            this._doughnutRetries += 1;
+            setTimeout(() => this.renderDoughnut(), 100);
+          }
+          return;
+        }
+        this._doughnutRetries = 0;
+        // Détruire l'ancien chart proprement avant d'en créer un nouveau
+        if (this._chart) {
+          try { this._chart.destroy(); } catch (e) { /* ignore */ }
+          this._chart = null;
+        }
+        const b = this.result.breakdown;
+        let ctx;
+        try { ctx = canvas.getContext('2d'); } catch (e) { return; }
+        if (!ctx) return;
+        try {
+          this._chart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+              labels: ['Charges fixes', 'Crédits en cours', 'Quotité disponible', 'Reste à vivre'],
+              datasets: [{
+                data: [b.charges, b.credits, b.available_quotite, b.living_remainder],
+                backgroundColor: ['#b56a00', '#7c3aed', '#0aa25f', '#0b55d9'],
+                borderWidth: 0,
+              }],
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              animation: { duration: 250 },
+              plugins: {
+                legend: { position: 'bottom', labels: { font: { size: 11, weight: 'bold' } } },
+                tooltip: {
+                  callbacks: { label: (c) => c.label + ' : ' + Math.round(c.parsed).toLocaleString('fr-FR') + ' FCFA' }
+                },
+              },
+              cutout: '60%',
+            },
+          });
+        } catch (e) {
+          // Si Chart.js échoue (DOM inattendu), on laisse tomber sans crasher
+          this._chart = null;
+        }
+      },
+
+      // ---------- RESET ----------
+      reset() {
+        this.form = defaultForm();
+        this.result = null;
+        this.error = '';
+        try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+        if (this._chart) { try { this._chart.destroy(); } catch (e) {} this._chart = null; }
+      },
+    };
+  }
+</script>
 {% endblock %}

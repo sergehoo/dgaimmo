@@ -535,30 +535,55 @@ def _json_error(message, status=400):
 def public_banks_list(request):
     """GET JSON public : liste des banques actives avec leurs taux indicatifs.
 
-    Utilisé par les simulateurs publics de la landing pour pré-remplir le
-    taux annuel quand l'utilisateur sélectionne une banque.
+    Robuste : si la migration 0007 (champs mortgage_*) n'a pas encore été
+    appliquée, on retourne une liste avec ``rate=None`` au lieu de planter.
     """
     from django.http import JsonResponse
     from memberships.models import Bank
 
-    banks = (
-        Bank.objects.filter(active=True)
-        .order_by("name")
-        .values("id", "name", "code", "default_mortgage_rate",
-                "mortgage_max_duration_months", "is_partner", "website")
-    )
-    payload = [
-        {
-            "id": str(b["id"]),
-            "name": b["name"],
-            "code": b["code"],
-            "rate": float(b["default_mortgage_rate"]) if b["default_mortgage_rate"] else None,
-            "max_months": b["mortgage_max_duration_months"],
-            "is_partner": b["is_partner"],
-            "website": b["website"],
-        }
-        for b in banks
-    ]
+    payload = []
+    try:
+        # Essai avec tous les champs (migration 0007 appliquée)
+        banks = list(
+            Bank.objects.filter(active=True)
+            .order_by("name")
+            .values("id", "name", "code", "default_mortgage_rate",
+                    "mortgage_max_duration_months", "is_partner", "website")
+        )
+        for b in banks:
+            payload.append({
+                "id": str(b["id"]),
+                "name": b["name"],
+                "code": b["code"],
+                "rate": float(b["default_mortgage_rate"]) if b.get("default_mortgage_rate") else None,
+                "max_months": b.get("mortgage_max_duration_months") or 240,
+                "is_partner": b.get("is_partner", False),
+                "website": b.get("website", ""),
+            })
+    except Exception as exc:
+        # Champs mortgage_* manquants → fallback sur les champs de base
+        try:
+            banks = list(
+                Bank.objects.filter(active=True)
+                .order_by("name")
+                .values("id", "name", "code", "is_partner", "website")
+            )
+            for b in banks:
+                payload.append({
+                    "id": str(b["id"]),
+                    "name": b["name"],
+                    "code": b["code"],
+                    "rate": None,
+                    "max_months": 240,
+                    "is_partner": b.get("is_partner", False),
+                    "website": b.get("website", ""),
+                })
+        except Exception:
+            return JsonResponse({
+                "ok": False,
+                "error": "Catalogue banques indisponible — appliquez `python manage.py migrate memberships`.",
+                "banks": [],
+            }, status=500)
     return JsonResponse({"ok": True, "banks": payload})
 
 
@@ -649,21 +674,95 @@ def public_simulate_credit(request):
 
 
 def public_simulate_quotite(request):
-    """POST AJAX : simulateur grand public de quotité cessible.
+    """POST AJAX : simulateur **Côte d'Ivoire** de quotité cessible.
 
-    Entrées : revenu net mensuel, revenus complémentaires, charges fixes,
-    autres prêts en cours (mensualité totale), taux d'endettement max %.
+    Accepte deux modes :
+    1. ``application/json`` body avec ``revenues``, ``charges``, ``credits``
+       (arrays dynamiques) → moteur complet ``compute_quotite_simulation``.
+    2. ``application/x-www-form-urlencoded`` (mode legacy) avec champs plats.
 
-    Retour : capacité brute, capacité nette, reste à vivre, montant
-    finançable, taux d'endettement, décision (éligible / sous réserve /
-    non éligible).
+    Le moteur applique le barème officiel CI, calcule la quotité disponible,
+    la capacité finançable, la décision, les recommandations et le
+    comparateur banques partenaires.
     """
     from django.http import JsonResponse
     from decimal import Decimal
+    import json as _json
     from real_estate.services import monthly_payment, financeable_amount
+    from real_estate.quotite_ci import compute_quotite_simulation
+    from memberships.models import Bank
 
     if request.method != "POST":
         return _json_error("Méthode non autorisée.", status=405)
+
+    # ---- Détection du mode JSON (payload riche v2) ----
+    content_type = (request.META.get("CONTENT_TYPE") or "").lower()
+    if "application/json" in content_type:
+        try:
+            payload = _json.loads(request.body.decode("utf-8") or "{}")
+        except (ValueError, UnicodeDecodeError):
+            return _json_error("Corps JSON invalide.")
+
+        # Validation robuste du salaire (gère null, "", "abc", "12,5")
+        raw_salary = payload.get("net_salary")
+        try:
+            salary_str = str(raw_salary if raw_salary is not None else "").strip().replace(",", ".")
+            if not salary_str:
+                return _json_error("Le champ « Salaire net mensuel » est obligatoire.")
+            net_salary_val = Decimal(salary_str)
+            if net_salary_val <= 0:
+                return _json_error("Le salaire net mensuel doit être strictement positif.")
+        except Exception:
+            return _json_error(f"Salaire net invalide (saisi : « {raw_salary} »).")
+
+        # Banques partenaires (pour comparateur) — robuste à la non-application de la migration 0007
+        partner_banks = []
+        try:
+            raw_banks = list(
+                Bank.objects.filter(active=True)
+                .order_by("name")
+                .values("id", "name", "code", "default_mortgage_rate",
+                        "mortgage_max_duration_months", "is_partner")
+            )
+            for b in raw_banks:
+                partner_banks.append({
+                    "id": str(b["id"]),
+                    "name": b["name"],
+                    "code": b["code"],
+                    "rate": float(b["default_mortgage_rate"]) if b.get("default_mortgage_rate") else None,
+                    "max_months": b.get("mortgage_max_duration_months") or 240,
+                    "is_partner": b.get("is_partner", False),
+                })
+        except Exception:
+            # Migration 0007 non appliquée → comparateur vide mais la simulation
+            # continue. L'utilisateur verra une simulation normale sans tableau de
+            # comparaison banques.
+            partner_banks = []
+
+        # Banque sélectionnée
+        bank_dict = None
+        bank_id = payload.get("bank_id")
+        if bank_id:
+            bank_dict = next((b for b in partner_banks if b["id"] == bank_id), None)
+
+        try:
+            result = compute_quotite_simulation(
+                net_salary=net_salary_val,
+                additional_revenues=payload.get("revenues") or [],
+                charges=payload.get("charges") or [],
+                credits=payload.get("credits") or [],
+                project_amount=payload.get("project_amount"),
+                personal_deposit=payload.get("personal_deposit"),
+                duration_months=payload.get("duration_months") or 240,
+                annual_rate=payload.get("annual_rate"),
+                bank=bank_dict,
+                partner_banks=partner_banks,
+            )
+        except Exception as exc:
+            return _json_error(f"Erreur de calcul : {exc}", status=500)
+        return JsonResponse(result)
+
+    # ---- Mode legacy form-urlencoded (compat ancien front) ----
 
     # ---- Validation champ par champ avec messages explicites ----
     net_salary, err = _parse_decimal_field(
