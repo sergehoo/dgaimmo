@@ -192,6 +192,11 @@ if _GIS_REQUESTED:
             stacklevel=1,
         )
 
+if os.getenv("GDAL_LIBRARY_PATH"):
+    GDAL_LIBRARY_PATH = os.getenv("GDAL_LIBRARY_PATH")
+if os.getenv("GEOS_LIBRARY_PATH"):
+    GEOS_LIBRARY_PATH = os.getenv("GEOS_LIBRARY_PATH")
+
 
 # ---------------------------------------------------------------------------
 # Sécurité de base — DEBUG et SECRET_KEY sont fixés dans dev.py / prod.py

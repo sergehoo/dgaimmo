@@ -24,8 +24,9 @@ x-common-env: &common_env
   TZ: Africa/Abidjan
   TIME_ZONE: Africa/Abidjan
   DJANGO_SETTINGS_MODULE: config.settings
+  DJANGO_ENV: prod
   DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?must be set}
-  DJANGO_DEBUG: "False"
+  DJANGO_DEBUG: "0"
   DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:?must be set}
   CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:?must be set}
   CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
