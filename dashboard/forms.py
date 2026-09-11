@@ -752,6 +752,117 @@ class MemberInvitationForm(forms.Form):
         return unique_emails
 
 
+class QuickMemberInviteForm(forms.Form):
+    """Invitation rapide d'UN nouveau membre depuis la liste des membres.
+
+    Le gestionnaire saisit l'email (obligatoire), éventuellement le nom pour
+    pré-remplir le formulaire du prospect, et un court message.
+    """
+
+    email = forms.EmailField(
+        label="Email du nouveau membre",
+        widget=forms.EmailInput(attrs={"placeholder": "prenom.nom@email.ci", "autocomplete": "off"}),
+    )
+    full_name = forms.CharField(
+        label="Nom complet (optionnel)",
+        required=False,
+        max_length=180,
+        widget=forms.TextInput(attrs={"placeholder": "Prénom NOM"}),
+    )
+    message = forms.CharField(
+        label="Message (optionnel)",
+        required=False,
+        widget=forms.Textarea(attrs={"rows": 2, "placeholder": "Bonjour, rejoignez notre mutuelle..."}),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["email"].widget.attrs.setdefault("class", BASE_INPUT)
+        self.fields["full_name"].widget.attrs.setdefault("class", BASE_INPUT)
+        self.fields["message"].widget.attrs.setdefault("class", BASE_TEXTAREA.replace("min-h-28", "min-h-20"))
+
+    def clean_email(self):
+        return self.cleaned_data["email"].strip().lower()
+
+    def clean_full_name(self):
+        return " ".join((self.cleaned_data.get("full_name") or "").split())
+
+
+class InvitationAcceptForm(MemberCreateForm):
+    """Formulaire public d'acceptation d'une invitation.
+
+    Par rapport à ``MemberCreateForm`` :
+    - l'email est **verrouillé** sur celui de l'invitation (c'est l'adresse
+      qui a reçu le lien : elle fait office de preuve de propriété) ;
+    - si aucun compte utilisateur n'existe pour cet email, le prospect
+      choisit son mot de passe pour pouvoir se connecter immédiatement à
+      son espace mutualiste ;
+    - les doublons (téléphone déjà enregistré dans la mutuelle) sont bloqués.
+    """
+
+    password1 = forms.CharField(
+        label="Mot de passe",
+        required=False,
+        widget=forms.PasswordInput(attrs={"autocomplete": "new-password", "placeholder": "8 caractères minimum"}),
+        help_text="Vous l'utiliserez pour accéder à votre espace mutualiste.",
+    )
+    password2 = forms.CharField(
+        label="Confirmer le mot de passe",
+        required=False,
+        widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
+    )
+
+    def __init__(self, *args, invitation, create_account=True, **kwargs):
+        self.invitation = invitation
+        self.create_account = create_account
+        kwargs.setdefault("mutuelle", invitation.mutuelle)
+        initial = dict(kwargs.pop("initial", None) or {})
+        initial["email"] = invitation.email
+        super().__init__(*args, initial=initial, **kwargs)
+        # Email verrouillé : non modifiable côté client, forcé côté serveur.
+        self.fields["email"].disabled = True
+        self.fields["email"].required = False
+        self.fields["email"].help_text = "Adresse ayant reçu l'invitation (non modifiable)."
+        # Pas de code membre saisi par le prospect : il est généré.
+        self.fields.pop("member_code", None)
+        if self.create_account:
+            self.fields["password1"].required = True
+            self.fields["password2"].required = True
+        else:
+            self.fields.pop("password1", None)
+            self.fields.pop("password2", None)
+        for name in ("password1", "password2"):
+            if name in self.fields:
+                self.fields[name].widget.attrs.setdefault("class", BASE_INPUT)
+
+    def clean_email(self):
+        # Quoi qu'il arrive, l'email du membre est celui de l'invitation.
+        return self.invitation.email.strip().lower()
+
+    def clean_phone(self):
+        phone = (self.cleaned_data.get("phone") or "").strip()
+        if phone and Member.all_objects.filter(mutuelle=self.invitation.mutuelle, phone=phone).exists():
+            raise forms.ValidationError(
+                "Ce numéro de téléphone est déjà enregistré dans la mutuelle. "
+                "Contactez l'administrateur si vous pensez qu'il s'agit d'une erreur."
+            )
+        return phone
+
+    def clean(self):
+        cleaned = super().clean()
+        if self.create_account:
+            password1 = cleaned.get("password1")
+            password2 = cleaned.get("password2")
+            if password1 and password2 and password1 != password2:
+                self.add_error("password2", "Les mots de passe ne correspondent pas.")
+            elif password1:
+                try:
+                    validate_password(password1)
+                except forms.ValidationError as exc:
+                    self.add_error("password1", exc)
+        return cleaned
+
+
 class FinancialProfileForm(StyledModelForm):
     """Profil financier : revenus, charges, dettes, situation pro.
 

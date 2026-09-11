@@ -6,6 +6,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import login, update_session_auth_hash
 from django.contrib.auth.views import LoginView
+from django.views.decorators.http import require_POST
 from django.urls import reverse
 from django.utils import timezone
 from decimal import Decimal
@@ -1168,11 +1169,28 @@ def projects_center(request):
 
 @login_required
 def members_center(request):
+    from dashboard.forms import QuickMemberInviteForm
+    from memberships.models import MemberInvitation
+
     context = _global_context(request)
     context["active_tab"] = "members"
     scope = _user_accessible_mutuelles(request.user)
     context["members"] = Member.all_objects.filter(mutuelle__in=scope).select_related("mutuelle").order_by("-created_at")[:30]
     context["simulations"] = QuotiteCessibleSimulation.all_objects.filter(mutuelle__in=scope).select_related("member", "mutuelle").order_by("-created_at")[:8]
+
+    # --- Invitation par email (formulaire rapide + suivi des invitations) ---
+    now = timezone.now()
+    invitations_qs = (
+        MemberInvitation.all_objects.filter(mutuelle__in=scope)
+        .select_related("mutuelle", "invited_by", "member")
+        .order_by("-created_at")
+    )
+    open_statuses = [MemberInvitation.Status.PENDING, MemberInvitation.Status.SENT]
+    context["invite_form"] = QuickMemberInviteForm()
+    context["invite_mutuelle"] = _active_mutuelle(request)
+    context["pending_invitations"] = invitations_qs.filter(status__in=open_statuses, expires_at__gt=now)[:20]
+    context["invitations_pending_count"] = invitations_qs.filter(status__in=open_statuses, expires_at__gt=now).count()
+    context["invitations_accepted_count"] = invitations_qs.filter(status=MemberInvitation.Status.ACCEPTED).count()
     return render(request, "dashboard/members.html", context)
 
 
@@ -1719,17 +1737,145 @@ def send_member_invitations(request):
     return render(request, "dashboard/send_invitations.html", context)
 
 
+INVITATION_DEFAULT_TTL_DAYS = 14
+
+
+@login_required
+@require_POST
+@transaction.atomic
+def invite_member(request):
+    """Invitation rapide d'UN nouveau membre depuis la liste des membres.
+
+    Crée (ou réutilise) une invitation pour l'email saisi, envoie le lien
+    sécurisé ``/rejoindre/<token>/`` puis revient sur la liste des membres.
+    """
+    from dashboard.forms import QuickMemberInviteForm
+    from memberships.services import create_invitation, send_member_invitation
+
+    active_mutuelle = _active_mutuelle(request)
+    if not active_mutuelle:
+        return redirect("create-mutuelle")
+
+    form = QuickMemberInviteForm(request.POST)
+    if not form.is_valid():
+        for field_errors in form.errors.values():
+            for error in field_errors:
+                messages.error(request, error)
+        return redirect("members-center")
+
+    data = form.cleaned_data
+    try:
+        invitation = create_invitation(
+            active_mutuelle,
+            data["email"],
+            invited_by=request.user,
+            full_name=data.get("full_name", ""),
+            message=data.get("message", ""),
+            ttl_days=INVITATION_DEFAULT_TTL_DAYS,
+        )
+    except ValueError as exc:
+        messages.warning(request, f"{data['email']} : {exc}")
+        return redirect("members-center")
+
+    # Invitation réutilisée : on complète les infos si l'admin en donne de nouvelles
+    update_fields = []
+    if data.get("full_name") and not invitation.full_name:
+        invitation.full_name = data["full_name"]
+        update_fields.append("full_name")
+    if data.get("message") and invitation.message != data["message"]:
+        invitation.message = data["message"]
+        update_fields.append("message")
+    if update_fields:
+        invitation.save(update_fields=update_fields)
+
+    if send_member_invitation(invitation, request=request):
+        messages.success(
+            request,
+            f"Invitation envoyée à {invitation.email}. Le lien est valable {INVITATION_DEFAULT_TTL_DAYS} jours.",
+        )
+    else:
+        messages.warning(
+            request,
+            f"Invitation créée pour {invitation.email}, mais l'email n'a pas pu être envoyé. "
+            "Vous pouvez copier le lien depuis la liste des invitations en attente.",
+        )
+    return redirect("members-center")
+
+
+def _invitation_in_scope_or_404(request, invitation_id):
+    """Charge une invitation en vérifiant que l'utilisateur gère sa mutuelle."""
+    from memberships.models import MemberInvitation
+
+    invitation = get_object_or_404(
+        MemberInvitation.all_objects.select_related("mutuelle"), pk=invitation_id
+    )
+    if not _user_can_access_mutuelle(request.user, invitation.mutuelle):
+        raise Http404("Invitation introuvable.")
+    return invitation
+
+
+@login_required
+@require_POST
+@transaction.atomic
+def resend_member_invitation(request, invitation_id):
+    """Renvoie l'email d'invitation et prolonge la validité du lien."""
+    from datetime import timedelta
+
+    from memberships.models import MemberInvitation
+    from memberships.services import send_member_invitation
+
+    invitation = _invitation_in_scope_or_404(request, invitation_id)
+    if invitation.status == MemberInvitation.Status.ACCEPTED:
+        messages.info(request, f"{invitation.email} a déjà accepté l'invitation.")
+        return redirect("members-center")
+
+    invitation.status = MemberInvitation.Status.PENDING
+    invitation.expires_at = timezone.now() + timedelta(days=INVITATION_DEFAULT_TTL_DAYS)
+    invitation.save(update_fields=["status", "expires_at"])
+    if send_member_invitation(invitation, request=request):
+        messages.success(request, f"Invitation renvoyée à {invitation.email}.")
+    else:
+        messages.warning(request, f"Lien prolongé pour {invitation.email}, mais l'email n'a pas pu être envoyé.")
+    return redirect("members-center")
+
+
+@login_required
+@require_POST
+@transaction.atomic
+def cancel_member_invitation(request, invitation_id):
+    """Annule une invitation : le lien devient inutilisable."""
+    from memberships.models import MemberInvitation
+
+    invitation = _invitation_in_scope_or_404(request, invitation_id)
+    if invitation.status == MemberInvitation.Status.ACCEPTED:
+        messages.info(request, f"{invitation.email} a déjà accepté l'invitation : elle ne peut plus être annulée.")
+        return redirect("members-center")
+    invitation.status = MemberInvitation.Status.CANCELLED
+    invitation.save(update_fields=["status"])
+    messages.success(request, f"Invitation de {invitation.email} annulée.")
+    return redirect("members-center")
+
+
 # ===========================================================================
 # Vue publique : acceptation d'une invitation
 # ===========================================================================
 @transaction.atomic
 def accept_member_invitation(request, token):
-    """Vue publique : un prospect clique sur le lien reçu par email et
-    complète son profil pour rejoindre la mutuelle."""
-    from memberships.models import MemberInvitation
-    from dashboard.forms import MemberCreateForm
+    """Vue publique : un prospect clique sur le lien reçu par email, complète
+    les informations restantes et devient membre de la mutuelle.
 
-    invitation = get_object_or_404(MemberInvitation.all_objects, token=token)
+    À la validation :
+    - un ``Member`` **actif** est créé (email = celui de l'invitation) ;
+    - un compte utilisateur est créé avec le mot de passe choisi (ou le
+      compte existant portant cet email est rattaché) ;
+    - le prospect est connecté et redirigé vers son espace mutualiste.
+    """
+    from memberships.models import MemberInvitation
+    from dashboard.forms import InvitationAcceptForm
+
+    invitation = get_object_or_404(
+        MemberInvitation.all_objects.select_related("mutuelle"), token=token
+    )
 
     # Garde-fous : accepté, annulé, expiré → écrans dédiés
     if invitation.status == MemberInvitation.Status.ACCEPTED:
@@ -1744,63 +1890,115 @@ def accept_member_invitation(request, token):
         context = {"invitation": invitation, "state": "expired"}
         return render(request, "dashboard/accept_invitation_state.html", context)
 
-    initial = {"email": invitation.email}
+    User = _get_user_model()
+    existing_user = User.objects.filter(email__iexact=invitation.email).first()
+    create_account = existing_user is None
+
+    initial = {}
     if invitation.full_name:
         parts = invitation.full_name.split(maxsplit=1)
         initial["first_name"] = parts[0]
         if len(parts) > 1:
             initial["last_name"] = parts[1]
 
-    form = MemberCreateForm(
+    form = InvitationAcceptForm(
         request.POST or None,
         request.FILES or None,
-        mutuelle=invitation.mutuelle,
+        invitation=invitation,
+        create_account=create_account,
         initial=initial,
     )
     if request.method == "POST" and form.is_valid():
-        member = form.save()
+        mutuelle = invitation.mutuelle
+
+        # 1) Le membre devient effectif : statut actif, date d'adhésion du jour
+        member = form.save(commit=False)
+        member.email = invitation.email
+        member.status = Member.Status.ACTIVE
+        member.joined_at = timezone.now().date()
+        member.metadata = {
+            **(member.metadata or {}),
+            "onboarding": "invitation",
+            "invitation_id": str(invitation.pk),
+        }
+        member.save()
+        member.ensure_referral_code()
+
+        # 2) Compte utilisateur : création avec mot de passe OU rattachement
+        user = existing_user
+        if user is None:
+            phone = (member.phone or "").strip() or None
+            if phone and User.objects.filter(phone=phone).exists():
+                phone = None  # le téléphone est unique côté User
+            user = User(
+                username=invitation.email,
+                email=invitation.email,
+                first_name=member.first_name,
+                last_name=member.last_name,
+                phone=phone,
+                role=User.Role.MEMBER,
+                default_mutuelle=mutuelle,
+            )
+            user.set_password(form.cleaned_data["password1"])
+            user.save()
+        else:
+            user_updates = []
+            if not user.first_name:
+                user.first_name = member.first_name
+                user_updates.append("first_name")
+            if not user.last_name:
+                user.last_name = member.last_name
+                user_updates.append("last_name")
+            if user.default_mutuelle_id is None:
+                user.default_mutuelle = mutuelle
+                user_updates.append("default_mutuelle")
+            if user_updates:
+                user.save(update_fields=user_updates)
+
+        MutuelleMembership.objects.get_or_create(
+            mutuelle=mutuelle,
+            user=user,
+            defaults={"role": "member", "permissions": [], "active": True},
+        )
+        # Un User ne peut porter qu'un seul profil Member (OneToOne)
+        if not Member.all_objects.filter(user=user).exclude(pk=member.pk).exists():
+            member.user = user
+            member.save(update_fields=["user"])
+
+        # 3) Clôture de l'invitation
         invitation.member = member
         invitation.status = MemberInvitation.Status.ACCEPTED
         invitation.used_at = timezone.now()
         invitation.save(update_fields=["member", "status", "used_at"])
-        # Email de bienvenue si l'email est fourni + user associé au membre créé
+
+        # 4) Email de bienvenue (best-effort) + connexion automatique
         try:
-            if member.email:
-                User = _get_user_model()
-                user, _created = User.objects.get_or_create(
-                    email=member.email,
-                    defaults={
-                        "username": member.email,
-                        "first_name": member.first_name,
-                        "last_name": member.last_name,
-                        "phone": member.phone or None,
-                        "role": User.Role.MEMBER,
-                        "default_mutuelle": invitation.mutuelle,
-                    },
-                )
-                if _created:
-                    # Le user peut activer son compte via password reset
-                    user.set_unusable_password()
-                    user.save(update_fields=["password"])
-                    MutuelleMembership.objects.get_or_create(
-                        mutuelle=invitation.mutuelle, user=user,
-                        defaults={"role": "member", "permissions": [], "active": True},
-                    )
-                    member.user = user
-                    member.save(update_fields=["user"])
-                send_welcome_email(user, mutuelle=invitation.mutuelle, request=request)
+            send_welcome_email(user, mutuelle=mutuelle, request=request)
         except Exception:  # pragma: no cover
             pass
+
+        logged_in = False
+        if create_account and not request.user.is_authenticated:
+            login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+            logged_in = True
+
         return render(
             request,
             "dashboard/accept_invitation_state.html",
-            {"invitation": invitation, "member": member, "state": "success"},
+            {
+                "invitation": invitation,
+                "member": member,
+                "state": "success",
+                "logged_in": logged_in,
+                "account_created": create_account,
+            },
         )
 
     context = {
         "form": form,
         "invitation": invitation,
         "active_mutuelle": invitation.mutuelle,
+        "create_account": create_account,
         "title": f"Rejoignez {invitation.mutuelle.name}",
         "subtitle": "Complétez votre profil pour devenir membre.",
         "submit_label": "Finaliser mon adhésion",

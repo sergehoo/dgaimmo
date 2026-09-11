@@ -22,6 +22,12 @@
     <section class="mt-6 rounded-2xl border border-[#e5edf8] bg-white p-7 shadow-sm">
       <h2 class="mb-1 text-xl font-black"><i class="fa-solid fa-user-plus text-[#0aa25f]"></i> Complétez votre profil</h2>
       <p class="mb-6 text-sm font-semibold text-[#536484]">Renseignez vos informations pour finaliser votre adhésion à la mutuelle.</p>
+      {% if invitation and not create_account %}
+      <div class="mb-6 flex items-start gap-3 rounded-2xl border border-[#dbe6f5] bg-[#f7faff] p-4 text-sm font-semibold text-[#06337d]">
+        <i class="fa-solid fa-user-check mt-0.5"></i>
+        <div>Un compte existe déjà pour <b>{{ invitation.email }}</b> : votre profil mutualiste y sera rattaché. Vous vous connecterez avec votre mot de passe habituel.</div>
+      </div>
+      {% endif %}
 
       <form method="post" enctype="multipart/form-data">
         {% csrf_token %}
@@ -42,8 +48,9 @@
             {% for error in form.first_name.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
           </div>
           <div>
-            <label class="mb-2 block text-sm font-black" for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>
+            <label class="mb-2 block text-sm font-black" for="{{ form.email.id_for_label }}">{{ form.email.label }}{% if invitation %} <i class="fa-solid fa-lock text-xs text-[#536484]" title="Adresse ayant reçu l'invitation"></i>{% endif %}</label>
             {{ form.email }}
+            {% if form.email.help_text %}<p class="mt-1 text-xs font-semibold text-[#536484]">{{ form.email.help_text }}</p>{% endif %}
             {% for error in form.email.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
           </div>
           <div>
@@ -83,6 +90,25 @@
             </label>
           {% endfor %}
         </div>
+
+        {% if form.password1 %}
+        {# Création du compte de connexion à l'espace mutualiste #}
+        <h3 class="mt-7 mb-3 text-sm font-black uppercase text-[#0b55d9]"><i class="fa-solid fa-key"></i> Mon accès à l'espace mutualiste</h3>
+        <div class="grid gap-5 rounded-2xl border border-[#e5edf8] bg-[#f7faff] p-5 md:grid-cols-2">
+          <div>
+            <label class="mb-2 block text-sm font-black" for="{{ form.password1.id_for_label }}">{{ form.password1.label }} <span class="text-red-500">*</span></label>
+            {{ form.password1 }}
+            {% if form.password1.help_text %}<p class="mt-1 text-xs font-semibold text-[#536484]">{{ form.password1.help_text }}</p>{% endif %}
+            {% for error in form.password1.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+          </div>
+          <div>
+            <label class="mb-2 block text-sm font-black" for="{{ form.password2.id_for_label }}">{{ form.password2.label }} <span class="text-red-500">*</span></label>
+            {{ form.password2 }}
+            {% for error in form.password2.errors %}<p class="mt-1 text-xs font-bold text-red-600">{{ error }}</p>{% endfor %}
+          </div>
+          <p class="text-xs font-semibold text-[#536484] md:col-span-2"><i class="fa-solid fa-circle-info"></i> Identifiant de connexion : <b>{{ invitation.email }}</b></p>
+        </div>
+        {% endif %}
 
         <div class="mt-8 flex flex-wrap gap-3">
           <button type="submit" class="rounded-2xl bg-[#0aa25f] px-7 py-4 text-sm font-black text-white shadow-xl shadow-emerald-900/20"><i class="fa-solid fa-circle-check"></i> {{ submit_label }}</button>

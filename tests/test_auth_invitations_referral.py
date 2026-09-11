@@ -326,3 +326,265 @@ class MemberPortalTests(TestCase):
         response = self.client.get(reverse("dashboard-home"))
         self.assertEqual(response.status_code, 302)
         self.assertIn(reverse("member-portal"), response.url)
+
+
+@override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend", **TEST_STATIC_OVERRIDES)
+class InvitationEndToEndTests(TestCase):
+    """Parcours complet : invitation depuis la liste des membres → email →
+    acceptation par le prospect → membre actif + compte connecté."""
+
+    def setUp(self):
+        self.password = "Secure!Passw0rd"
+        self.mutuelle = Mutuelle.objects.create(
+            name="Mutuelle E2E", slug="mutuelle-e2e",
+            organization_name="E2E Org",
+            organization_type=Mutuelle.OrganizationType.ENTREPRISE,
+            estimated_members_count=10, country="CI", currency="XOF",
+        )
+        self.admin = User.objects.create_user(
+            username="admin@e2e.ci", email="admin@e2e.ci",
+            password=self.password, first_name="Awa", last_name="ADMIN",
+            role=User.Role.MUTUELLE_ADMIN, default_mutuelle=self.mutuelle,
+        )
+        MutuelleMembership.objects.create(
+            mutuelle=self.mutuelle, user=self.admin,
+            role="admin", permissions=["*"], active=True,
+        )
+        self.admin_client = Client()
+        self.admin_client.login(username=self.admin.email, password=self.password)
+        mail.outbox = []
+
+    # --- Liste des membres : formulaire d'invitation --------------------------
+    def test_members_center_shows_invite_form(self):
+        response = self.admin_client.get(reverse("members-center"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Inviter par email")
+        self.assertContains(response, reverse("invite-member"))
+        self.assertContains(response, "Invitations en attente")
+
+    def test_quick_invite_requires_login(self):
+        response = self.client.post(reverse("invite-member"), {"email": "x@e2e.ci"})
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("login"), response.url)
+
+    def test_quick_invite_creates_invitation_and_sends_email(self):
+        response = self.admin_client.post(
+            reverse("invite-member"),
+            {"email": "Prospect@E2E.ci", "full_name": "Koffi PROSPECT", "message": "Bienvenue !"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("members-center"))
+
+        inv = MemberInvitation.all_objects.get(mutuelle=self.mutuelle, email="prospect@e2e.ci")
+        self.assertEqual(inv.status, MemberInvitation.Status.SENT)
+        self.assertEqual(inv.full_name, "Koffi PROSPECT")
+        self.assertEqual(inv.invited_by_id, self.admin.id)
+        self.assertIsNotNone(inv.sent_at)
+
+        self.assertEqual(len(mail.outbox), 1)
+        email = mail.outbox[0]
+        self.assertEqual(email.to, ["prospect@e2e.ci"])
+        self.assertIn(self.mutuelle.name, email.subject)
+        self.assertIn(reverse("accept-member-invitation", kwargs={"token": inv.token}), email.body)
+        self.assertIn("Bienvenue !", email.body)
+
+        # L'invitation apparaît ensuite dans la liste des membres
+        listing = self.admin_client.get(reverse("members-center"))
+        self.assertContains(listing, "prospect@e2e.ci")
+        self.assertContains(listing, "Invitation envoyée à prospect@e2e.ci")
+
+    def test_quick_invite_rejects_existing_member(self):
+        Member.all_objects.create(
+            mutuelle=self.mutuelle, member_code="E2E-0001",
+            first_name="Deja", last_name="LA", phone="+2250700000009",
+            email="deja@e2e.ci", qr_token="qr-deja",
+        )
+        response = self.admin_client.post(reverse("invite-member"), {"email": "deja@e2e.ci"}, follow=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(MemberInvitation.all_objects.filter(email="deja@e2e.ci").exists())
+        self.assertContains(response, "déjà enregistré")
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_quick_invite_invalid_email(self):
+        response = self.admin_client.post(reverse("invite-member"), {"email": "pas-un-email"}, follow=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(MemberInvitation.all_objects.exists())
+
+    # --- Acceptation par le prospect ------------------------------------------
+    def _invite(self, email="new@e2e.ci", **kwargs):
+        from memberships.services import create_invitation
+        return create_invitation(self.mutuelle, email, invited_by=self.admin, **kwargs)
+
+    def _accept_payload(self, **overrides):
+        payload = {
+            "first_name": "Nouveau",
+            "last_name": "MEMBRE",
+            "phone": "+2250700777777",
+            "marital_status": Member.MaritalStatus.SINGLE,
+            "dependents_count": 0,
+            "password1": "MonSuperMdp!2026",
+            "password2": "MonSuperMdp!2026",
+        }
+        payload.update(overrides)
+        return payload
+
+    def test_accept_page_locks_email_and_asks_password(self):
+        inv = self._invite(full_name="Nouveau MEMBRE")
+        response = self.client.get(reverse("accept-member-invitation", kwargs={"token": inv.token}))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Complétez votre profil")
+        self.assertContains(response, 'name="password1"')
+        self.assertContains(response, 'name="password2"')
+        self.assertContains(response, 'value="new@e2e.ci"')
+        self.assertContains(response, "disabled")
+        # Pré-remplissage depuis le nom saisi par l'admin
+        self.assertContains(response, 'value="Nouveau"')
+
+    def test_accept_creates_active_member_user_and_logs_in(self):
+        inv = self._invite()
+        url = reverse("accept-member-invitation", kwargs={"token": inv.token})
+        # Tentative de changer l'email : ignorée, l'email reste celui de l'invitation
+        response = self.client.post(url, self._accept_payload(email="autre@evil.ci"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Bienvenue")
+        self.assertContains(response, reverse("member-portal"))
+
+        member = Member.all_objects.get(mutuelle=self.mutuelle, phone="+2250700777777")
+        self.assertEqual(member.email, "new@e2e.ci")
+        self.assertEqual(member.status, Member.Status.ACTIVE)
+        self.assertIsNotNone(member.joined_at)
+        self.assertTrue(member.member_code)
+        self.assertTrue(member.referral_code)
+        self.assertEqual(member.metadata.get("onboarding"), "invitation")
+
+        user = User.objects.get(email="new@e2e.ci")
+        self.assertTrue(user.check_password("MonSuperMdp!2026"))
+        self.assertEqual(user.role, User.Role.MEMBER)
+        self.assertEqual(user.default_mutuelle_id, self.mutuelle.id)
+        self.assertEqual(member.user_id, user.id)
+        self.assertTrue(
+            MutuelleMembership.objects.filter(mutuelle=self.mutuelle, user=user, role="member", active=True).exists()
+        )
+
+        inv.refresh_from_db()
+        self.assertEqual(inv.status, MemberInvitation.Status.ACCEPTED)
+        self.assertEqual(inv.member_id, member.id)
+        self.assertIsNotNone(inv.used_at)
+
+        # Connecté automatiquement : l'espace mutualiste est accessible
+        portal = self.client.get(reverse("member-portal"))
+        self.assertEqual(portal.status_code, 200)
+        self.assertContains(portal, "Nouveau")
+
+        # Email de bienvenue envoyé au nouveau membre
+        welcome = [m for m in mail.outbox if "Bienvenue" in m.subject]
+        self.assertEqual(len(welcome), 1)
+        self.assertEqual(welcome[0].to, ["new@e2e.ci"])
+
+        # Le lien ne peut plus être réutilisé
+        again = self.client.get(url)
+        self.assertContains(again, "Invitation déjà acceptée")
+
+    def test_accept_password_mismatch_blocks_creation(self):
+        inv = self._invite()
+        response = self.client.post(
+            reverse("accept-member-invitation", kwargs={"token": inv.token}),
+            self._accept_payload(password2="Different!2026"),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "ne correspondent pas")
+        self.assertFalse(Member.all_objects.filter(phone="+2250700777777").exists())
+        self.assertFalse(User.objects.filter(email="new@e2e.ci").exists())
+        inv.refresh_from_db()
+        self.assertEqual(inv.status, MemberInvitation.Status.PENDING)
+
+    def test_accept_missing_password_blocks_creation(self):
+        inv = self._invite()
+        payload = self._accept_payload()
+        payload.pop("password1")
+        payload.pop("password2")
+        response = self.client.post(reverse("accept-member-invitation", kwargs={"token": inv.token}), payload)
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Member.all_objects.filter(phone="+2250700777777").exists())
+
+    def test_accept_duplicate_phone_blocked(self):
+        Member.all_objects.create(
+            mutuelle=self.mutuelle, member_code="E2E-0002",
+            first_name="Tel", last_name="PRIS", phone="+2250700777777",
+            email="tel@e2e.ci", qr_token="qr-tel",
+        )
+        inv = self._invite()
+        response = self.client.post(
+            reverse("accept-member-invitation", kwargs={"token": inv.token}), self._accept_payload()
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "déjà enregistré")
+        self.assertFalse(Member.all_objects.filter(email="new@e2e.ci").exists())
+
+    def test_accept_with_existing_user_links_account_without_password(self):
+        existing = User.objects.create_user(
+            username="exist@e2e.ci", email="exist@e2e.ci", password="OldPassw0rd!",
+        )
+        inv = self._invite(email="exist@e2e.ci")
+        url = reverse("accept-member-invitation", kwargs={"token": inv.token})
+
+        page = self.client.get(url)
+        self.assertNotContains(page, 'name="password1"')
+        self.assertContains(page, "Un compte existe déjà")
+
+        payload = self._accept_payload()
+        payload.pop("password1")
+        payload.pop("password2")
+        response = self.client.post(url, payload)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Bienvenue")
+        # Pas de connexion automatique : bouton "Se connecter"
+        self.assertContains(response, reverse("login"))
+
+        member = Member.all_objects.get(email="exist@e2e.ci")
+        self.assertEqual(member.user_id, existing.id)
+        self.assertEqual(member.status, Member.Status.ACTIVE)
+        existing.refresh_from_db()
+        self.assertTrue(existing.check_password("OldPassw0rd!"))
+        self.assertEqual(existing.default_mutuelle_id, self.mutuelle.id)
+        self.assertTrue(MutuelleMembership.objects.filter(mutuelle=self.mutuelle, user=existing).exists())
+
+    # --- Gestion des invitations en attente ----------------------------------
+    def test_cancel_invitation_makes_link_unusable(self):
+        inv = self._invite()
+        response = self.admin_client.post(reverse("cancel-member-invitation", kwargs={"invitation_id": inv.id}))
+        self.assertEqual(response.status_code, 302)
+        inv.refresh_from_db()
+        self.assertEqual(inv.status, MemberInvitation.Status.CANCELLED)
+        page = self.client.get(reverse("accept-member-invitation", kwargs={"token": inv.token}))
+        self.assertContains(page, "Lien expiré")
+        # Une nouvelle invitation peut être générée pour le même email
+        new_inv = self._invite()
+        self.assertNotEqual(new_inv.pk, inv.pk)
+
+    def test_resend_invitation_sends_mail_and_extends_expiry(self):
+        inv = self._invite(ttl_days=1)
+        response = self.admin_client.post(reverse("resend-member-invitation", kwargs={"invitation_id": inv.id}))
+        self.assertEqual(response.status_code, 302)
+        inv.refresh_from_db()
+        self.assertEqual(inv.status, MemberInvitation.Status.SENT)
+        self.assertGreater(inv.expires_at, timezone.now() + timedelta(days=13))
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["new@e2e.ci"])
+
+    def test_admin_cannot_manage_other_mutuelle_invitation(self):
+        other = Mutuelle.objects.create(
+            name="Autre Mutuelle", slug="autre-mutuelle",
+            organization_name="Autre", organization_type=Mutuelle.OrganizationType.ENTREPRISE,
+            estimated_members_count=5, country="CI", currency="XOF",
+        )
+        inv = MemberInvitation.all_objects.create(
+            mutuelle=other, email="autre@e2e.ci", expires_at=timezone.now() + timedelta(days=7),
+        )
+        response = self.admin_client.post(reverse("cancel-member-invitation", kwargs={"invitation_id": inv.id}))
+        self.assertEqual(response.status_code, 404)
+        inv.refresh_from_db()
+        self.assertEqual(inv.status, MemberInvitation.Status.PENDING)
+        # Et elle n'apparaît pas dans sa liste des membres
+        listing = self.admin_client.get(reverse("members-center"))
+        self.assertNotContains(listing, "autre@e2e.ci")

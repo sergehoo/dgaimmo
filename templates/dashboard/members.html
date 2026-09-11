@@ -2,8 +2,27 @@
 {% block console_content %}
 <div class="mb-7 flex flex-wrap items-center justify-between gap-4">
   <div><p class="text-sm font-bold text-[#536484]">Réseau mutualiste</p><h1 class="text-3xl font-black">Membres</h1></div>
-  <a href="{% url 'create-member' %}" class="rounded-xl bg-[#0b55d9] px-5 py-3 text-sm font-black text-white no-underline">+ Ajouter un membre</a>
+  <div class="flex flex-wrap gap-3">
+    <a href="#inviter" class="rounded-xl border border-[#c9b8f7] bg-[#f5f0ff] px-5 py-3 text-sm font-black text-[#5b21b6] no-underline"><i class="fa-solid fa-envelope-open-text"></i> Inviter par email</a>
+    <a href="{% url 'create-member' %}" class="rounded-xl bg-[#0b55d9] px-5 py-3 text-sm font-black text-white no-underline">+ Ajouter un membre</a>
+  </div>
 </div>
+
+{% if messages %}
+<div class="mb-5 grid gap-3">
+  {% for msg in messages %}
+    <div class="flex items-start gap-3 rounded-2xl border p-4 text-sm font-bold
+      {% if 'warning' in msg.tags %}border-[#facc15] bg-[#fff7df] text-[#854d0e]
+      {% elif 'error' in msg.tags %}border-red-200 bg-red-50 text-red-700
+      {% elif 'success' in msg.tags %}border-[#86efac] bg-[#e8fff2] text-[#0b9f5b]
+      {% else %}border-[#dbe6f5] bg-[#f7faff] text-[#06337d]{% endif %}">
+      <i class="fa-solid {% if 'warning' in msg.tags %}fa-triangle-exclamation{% elif 'error' in msg.tags %}fa-circle-xmark{% elif 'success' in msg.tags %}fa-circle-check{% else %}fa-circle-info{% endif %} mt-0.5"></i>
+      <div>{{ msg }}</div>
+    </div>
+  {% endfor %}
+</div>
+{% endif %}
+
 <section class="grid gap-5 lg:grid-cols-[1fr_.55fr]">
   <article class="rounded-2xl border border-[#e5edf8] bg-white p-5 shadow-sm">
     <div class="mb-5 flex gap-3"><input class="min-h-12 flex-1 rounded-xl border border-[#e1e9f7] px-4 outline-none" placeholder="Rechercher un membre..."><button class="rounded-xl bg-[#f3f7ff] px-5 font-black">Filtrer</button></div>
@@ -13,18 +32,82 @@
         <tbody class="divide-y divide-[#edf2fb]">
           {% for member in members %}
           <tr class="cursor-pointer font-bold transition hover:bg-[#f7faff]" onclick="window.location='{% url 'member-detail' member.id %}'"><td class="px-4 py-4"><a href="{% url 'member-detail' member.id %}" class="text-[#06194a] no-underline hover:text-[#0b55d9]">{{ member.last_name|upper }} {{ member.first_name }}</a></td><td>{{ member.mutuelle.name }}</td><td>{{ member.phone }}</td><td>{% if member.kyc_validated %}<span class="text-[#0aa25f]"><i class="fa-solid fa-circle-check"></i> Validé</span>{% else %}<span class="text-[#b56a00]"><i class="fa-regular fa-clock"></i> En attente</span>{% endif %}</td><td>{{ member.get_status_display }}</td></tr>
+          {% empty %}
+          <tr><td colspan="5" class="px-4 py-8 text-center text-sm font-bold text-[#667899]">Aucun membre pour le moment. Invitez votre premier membre par email.</td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
   </article>
-  <aside class="rounded-2xl border border-[#e5edf8] bg-[#06194a] p-6 text-white shadow-sm">
-    <h2 class="font-black">Scores récents</h2>
-    <div class="mt-5 grid gap-3">
-      {% for simulation in simulations %}
-      <div class="rounded-xl bg-white/10 p-4"><b>{{ simulation.member.first_name }} {{ simulation.member.last_name }}</b><span class="mt-1 block text-sm text-white/70">{{ simulation.get_decision_display }} · {{ simulation.debt_ratio|floatformat:0|intcomma }}%</span></div>
-      {% endfor %}
-    </div>
-  </aside>
+
+  <div class="grid gap-5 content-start">
+    {# ---------- Invitation d'un nouveau membre par email ---------- #}
+    <article id="inviter" class="rounded-2xl border border-[#e2d9fb] bg-white p-6 shadow-sm">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <p class="text-xs font-black uppercase tracking-[.14em] text-[#7c3aed]"><i class="fa-solid fa-envelope-open-text"></i> Nouveau membre</p>
+          <h2 class="mt-1 text-xl font-black">Inviter par email</h2>
+          <p class="mt-1 text-xs font-semibold leading-5 text-[#536484]">Le membre reçoit un lien sécurisé, complète ses informations et rejoint {% if invite_mutuelle %}{{ invite_mutuelle.name }}{% else %}la mutuelle{% endif %}.</p>
+        </div>
+        <a href="{% url 'send-member-invitations' %}" class="flex-none rounded-xl border border-[#dce7f6] bg-[#f7faff] px-3 py-2 text-xs font-black text-[#06337d] no-underline" title="Inviter plusieurs personnes à la fois"><i class="fa-solid fa-users"></i> En lot</a>
+      </div>
+      <form method="post" action="{% url 'invite-member' %}" class="mt-5 grid gap-4">
+        {% csrf_token %}
+        <div>
+          <label class="mb-2 block text-sm font-black" for="{{ invite_form.email.id_for_label }}">{{ invite_form.email.label }} <span class="text-red-500">*</span></label>
+          {{ invite_form.email }}
+        </div>
+        <div>
+          <label class="mb-2 block text-sm font-black" for="{{ invite_form.full_name.id_for_label }}">{{ invite_form.full_name.label }}</label>
+          {{ invite_form.full_name }}
+        </div>
+        <div>
+          <label class="mb-2 block text-sm font-black" for="{{ invite_form.message.id_for_label }}">{{ invite_form.message.label }}</label>
+          {{ invite_form.message }}
+        </div>
+        <button type="submit" class="rounded-xl bg-[#7c3aed] px-5 py-3.5 text-sm font-black text-white shadow-lg shadow-purple-900/20"><i class="fa-solid fa-paper-plane"></i> Envoyer l'invitation</button>
+      </form>
+    </article>
+
+    {# ---------- Invitations en attente ---------- #}
+    <article class="rounded-2xl border border-[#e5edf8] bg-white p-6 shadow-sm">
+      <div class="flex items-center justify-between gap-3">
+        <h2 class="text-base font-black"><i class="fa-solid fa-hourglass-half text-[#b56a00]"></i> Invitations en attente</h2>
+        <div class="flex gap-2 text-xs font-black">
+          <span class="rounded-full bg-[#fff4e5] px-3 py-1 text-[#b56a00]">{{ invitations_pending_count }} en attente</span>
+          <span class="rounded-full bg-[#e8fff2] px-3 py-1 text-[#0b9f5b]">{{ invitations_accepted_count }} acceptée{{ invitations_accepted_count|pluralize }}</span>
+        </div>
+      </div>
+      <ul class="mt-4 divide-y divide-[#edf2fb]">
+        {% for inv in pending_invitations %}
+        <li class="flex flex-wrap items-center justify-between gap-3 py-3">
+          <div class="min-w-0">
+            <b class="block truncate text-sm">{{ inv.email }}</b>
+            <small class="block text-xs font-bold text-[#536484]">{% if inv.full_name %}{{ inv.full_name }} · {% endif %}{{ inv.get_status_display }} · expire le {{ inv.expires_at|date:"d/m/Y" }}</small>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <a href="{% url 'accept-member-invitation' token=inv.token %}" target="_blank" class="rounded-lg bg-[#eaf2ff] px-3 py-1.5 text-xs font-black text-[#0b55d9] no-underline" title="Ouvrir / copier le lien"><i class="fa-solid fa-link"></i> Lien</a>
+            <form method="post" action="{% url 'resend-member-invitation' invitation_id=inv.id %}">{% csrf_token %}<button type="submit" class="rounded-lg bg-[#f5f0ff] px-3 py-1.5 text-xs font-black text-[#5b21b6]"><i class="fa-solid fa-rotate-right"></i> Renvoyer</button></form>
+            <form method="post" action="{% url 'cancel-member-invitation' invitation_id=inv.id %}" onsubmit="return confirm('Annuler l\'invitation de {{ inv.email|escapejs }} ?');">{% csrf_token %}<button type="submit" class="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-black text-red-700"><i class="fa-solid fa-xmark"></i> Annuler</button></form>
+          </div>
+        </li>
+        {% empty %}
+        <li class="py-6 text-center text-sm font-bold text-[#667899]">Aucune invitation en attente.</li>
+        {% endfor %}
+      </ul>
+      <a href="{% url 'send-member-invitations' %}" class="mt-3 inline-block text-xs font-black text-[#0b55d9] no-underline">Voir l'historique complet des invitations →</a>
+    </article>
+
+    <aside class="rounded-2xl border border-[#e5edf8] bg-[#06194a] p-6 text-white shadow-sm">
+      <h2 class="font-black">Scores récents</h2>
+      <div class="mt-5 grid gap-3">
+        {% for simulation in simulations %}
+        <div class="rounded-xl bg-white/10 p-4"><b>{{ simulation.member.first_name }} {{ simulation.member.last_name }}</b><span class="mt-1 block text-sm text-white/70">{{ simulation.get_decision_display }} · {{ simulation.debt_ratio|floatformat:0|intcomma }}%</span></div>
+        {% empty %}
+        <p class="text-sm text-white/70">Aucune simulation récente.</p>
+        {% endfor %}
+      </div>
+    </aside>
+  </div>
 </section>
 {% endblock %}
