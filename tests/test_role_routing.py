@@ -259,3 +259,167 @@ class RoleScopedViewsTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "Mut A")
         self.assertContains(resp, "invitation")
+
+
+@override_settings(**TEST_OVERRIDES)
+class MemberPrivilegeTests(TestCase):
+    """Un simple mutualiste ne doit ni créer/inviter des membres, ni voir les
+    écrans de gestion ou les autres mutuelles."""
+
+    def setUp(self):
+        from django.core import mail
+
+        mail.outbox = []
+        self.password = "P@ssw0rd!12345"
+        self.mutuelle = Mutuelle.objects.create(
+            name="Mut Membre", slug="mut-membre",
+            organization_name="M SARL",
+            organization_type=Mutuelle.OrganizationType.ENTREPRISE,
+            estimated_members_count=10, country="CI", currency="XOF",
+        )
+        self.other = Mutuelle.objects.create(
+            name="Mut Autre", slug="mut-autre",
+            organization_name="O SARL",
+            organization_type=Mutuelle.OrganizationType.ENTREPRISE,
+            estimated_members_count=10, country="CI", currency="XOF",
+        )
+        # Mutualiste : compte + profil Member + adhésion role="member"
+        self.member_user = User.objects.create_user(
+            username="membre@mut.ci", email="membre@mut.ci", password=self.password,
+            first_name="Moussa", last_name="MEMBRE", role=User.Role.MEMBER,
+            default_mutuelle=self.mutuelle,
+        )
+        self.member = Member.all_objects.create(
+            mutuelle=self.mutuelle, user=self.member_user, member_code="MM-0001",
+            first_name="Moussa", last_name="MEMBRE", phone="+2250700888888",
+            email="membre@mut.ci", qr_token="qr-moussa", status=Member.Status.ACTIVE,
+        )
+        MutuelleMembership.objects.create(
+            mutuelle=self.mutuelle, user=self.member_user, role="member", permissions=[], active=True,
+        )
+        # Admin de la même mutuelle (garde-fou de non-régression)
+        self.admin_user = User.objects.create_user(
+            username="admin@mut.ci", email="admin@mut.ci", password=self.password,
+            role=User.Role.MUTUELLE_ADMIN, default_mutuelle=self.mutuelle,
+        )
+        MutuelleMembership.objects.create(
+            mutuelle=self.mutuelle, user=self.admin_user, role="admin", permissions=["*"], active=True,
+        )
+        self.invitation = MemberInvitation.all_objects.create(
+            mutuelle=self.mutuelle, email="cible@mut.ci",
+            expires_at=timezone.now() + timedelta(days=7),
+        )
+        self.member_client = Client()
+        self.member_client.login(username=self.member_user.email, password=self.password)
+
+    # --- Périmètre ------------------------------------------------------------
+    def test_member_has_no_console_scope(self):
+        from dashboard.views import _active_mutuelle, _user_accessible_mutuelles, _user_can_access_mutuelle
+
+        self.assertEqual(resolve_role(self.member_user), ROLE_MUTUALISTE)
+        self.assertEqual(list(_user_accessible_mutuelles(self.member_user)), [])
+        self.assertFalse(_user_can_access_mutuelle(self.member_user, self.mutuelle))
+        self.assertFalse(_user_can_access_mutuelle(self.member_user, self.other))
+        # L'admin conserve son périmètre
+        self.assertEqual(list(_user_accessible_mutuelles(self.admin_user)), [self.mutuelle])
+        self.assertTrue(_user_can_access_mutuelle(self.admin_user, self.mutuelle))
+        self.assertFalse(_user_can_access_mutuelle(self.admin_user, self.other))
+
+    # --- Écrans de gestion ---------------------------------------------------
+    def _assert_redirected_to_portal(self, response):
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("member-portal"))
+
+    def test_member_cannot_open_management_pages(self):
+        pages = [
+            reverse("members-center"),
+            reverse("create-member"),
+            reverse("import-members"),
+            reverse("send-member-invitations"),
+            reverse("mutuelles-list"),
+            reverse("mutuelle-detail", kwargs={"mutuelle_id": self.mutuelle.id}),
+            reverse("mutuelle-detail", kwargs={"mutuelle_id": self.other.id}),
+            reverse("member-detail", kwargs={"member_id": self.member.id}),
+            reverse("finance-center"),
+            reverse("reports-center"),
+            reverse("governance-center"),
+            reverse("projects-center"),
+            reverse("documents-center"),
+            reverse("mutuelle-report", kwargs={"mutuelle_id": self.mutuelle.id}),
+        ]
+        for url in pages:
+            with self.subTest(url=url):
+                self._assert_redirected_to_portal(self.member_client.get(url))
+
+    def test_member_cannot_invite(self):
+        from django.core import mail
+
+        response = self.member_client.post(
+            reverse("invite-member"), {"email": "nouveau@mut.ci", "full_name": "Nouveau X"}
+        )
+        self._assert_redirected_to_portal(response)
+        self.assertFalse(MemberInvitation.all_objects.filter(email="nouveau@mut.ci").exists())
+        self.assertEqual(len(mail.outbox), 0)
+
+        response = self.member_client.post(
+            reverse("send-member-invitations"), {"emails": "a@mut.ci\nb@mut.ci", "ttl_days": 14}
+        )
+        self._assert_redirected_to_portal(response)
+        self.assertFalse(MemberInvitation.all_objects.filter(email__in=["a@mut.ci", "b@mut.ci"]).exists())
+
+    def test_member_cannot_manage_invitations(self):
+        response = self.member_client.post(
+            reverse("resend-member-invitation", kwargs={"invitation_id": self.invitation.id})
+        )
+        self._assert_redirected_to_portal(response)
+        response = self.member_client.post(
+            reverse("cancel-member-invitation", kwargs={"invitation_id": self.invitation.id})
+        )
+        self._assert_redirected_to_portal(response)
+        self.invitation.refresh_from_db()
+        self.assertEqual(self.invitation.status, MemberInvitation.Status.PENDING)
+
+    def test_member_cannot_create_member(self):
+        before = Member.all_objects.count()
+        response = self.member_client.post(
+            reverse("create-member"),
+            {
+                "first_name": "Intrus", "last_name": "X", "phone": "+2250700999999",
+                "marital_status": Member.MaritalStatus.SINGLE, "dependents_count": 0,
+            },
+        )
+        self._assert_redirected_to_portal(response)
+        self.assertEqual(Member.all_objects.count(), before)
+
+    def test_member_api_access_denied(self):
+        response = self.member_client.get(reverse("member-list"))
+        self.assertEqual(response.status_code, 403)
+        response = self.member_client.get(reverse("mutuelle-list"))
+        self.assertEqual(response.status_code, 403)
+
+    def test_member_keeps_own_portal_and_profile(self):
+        self.assertEqual(self.member_client.get(reverse("member-portal")).status_code, 200)
+        self.assertEqual(self.member_client.get(reverse("profile-center")).status_code, 200)
+        resp = self.member_client.get(reverse("dashboard-home"))
+        self._assert_redirected_to_portal(resp)
+
+    def test_admin_still_has_access(self):
+        client = Client()
+        client.login(username=self.admin_user.email, password=self.password)
+        self.assertEqual(client.get(reverse("members-center")).status_code, 200)
+        self.assertEqual(client.get(reverse("create-member")).status_code, 200)
+        self.assertEqual(
+            client.get(reverse("mutuelle-detail", kwargs={"mutuelle_id": self.mutuelle.id})).status_code, 200
+        )
+        # …mais pas aux autres mutuelles
+        self.assertEqual(
+            client.get(reverse("mutuelle-detail", kwargs={"mutuelle_id": self.other.id})).status_code, 404
+        )
+
+    def test_anonymous_redirected_to_login(self):
+        response = self.client.get(reverse("members-center"))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("login"), response.url)
+        response = self.client.post(reverse("invite-member"), {"email": "x@mut.ci"})
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("login"), response.url)

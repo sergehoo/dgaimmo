@@ -25,6 +25,7 @@ from accounts.services import (
     verify_otp_challenge,
 )
 from dashboard.permissions import (
+    staff_required,
     ROLE_ANONYMOUS,
     ROLE_INVITE,
     ROLE_MUTUALISTE,
@@ -137,10 +138,15 @@ def _user_accessible_mutuelles(user):
         return Mutuelle.objects.none()
     if user.is_superuser:
         return Mutuelle.objects.all()
-    return Mutuelle.objects.filter(
-        staff_memberships__user=user,
-        staff_memberships__active=True,
-    ).distinct()
+    # Seules les adhésions de GESTION ouvrent le périmètre console : un simple
+    # mutualiste (role="member") ne voit aucune mutuelle en back-office.
+    staff_mutuelle_ids = _staff_memberships(user).values_list("mutuelle_id", flat=True)
+    return Mutuelle.objects.filter(id__in=staff_mutuelle_ids)
+
+
+def _staff_memberships(user):
+    """Adhésions actives donnant un rôle de gestion (tout sauf ``member``)."""
+    return MutuelleMembership.objects.filter(user=user, active=True).exclude(role="member")
 
 
 def _user_can_access_mutuelle(user, mutuelle) -> bool:
@@ -149,9 +155,7 @@ def _user_can_access_mutuelle(user, mutuelle) -> bool:
         return False
     if user.is_superuser:
         return True
-    return MutuelleMembership.objects.filter(
-        mutuelle=mutuelle, user=user, active=True
-    ).exists()
+    return _staff_memberships(user).filter(mutuelle=mutuelle).exists()
 
 
 def _active_mutuelle(request):
@@ -177,7 +181,7 @@ def _active_mutuelle(request):
     if not mutuelle and user is not None and user.is_authenticated:
         # Fallback : memberships actifs de l'utilisateur, admin prioritaire
         membership = (
-            MutuelleMembership.objects.filter(user=user, active=True)
+            _staff_memberships(user)
             .select_related("mutuelle")
             .order_by(
                 # priorité admin → autre rôle
@@ -971,6 +975,7 @@ def console_dashboard(request):
 
 
 @login_required
+@staff_required
 def mutuelles_list(request):
     """Liste des mutuelles accessibles à l'utilisateur (isolation tenant).
 
@@ -1048,6 +1053,7 @@ def _aggregate_member_objectives(mutuelle):
 
 
 @login_required
+@staff_required
 def mutuelle_detail(request, mutuelle_id):
     """Page de détail d'une mutuelle.
 
@@ -1158,6 +1164,7 @@ def mutuelle_detail(request, mutuelle_id):
 
 
 @login_required
+@staff_required
 def projects_center(request):
     context = _global_context(request)
     context["active_tab"] = "projects"
@@ -1168,6 +1175,7 @@ def projects_center(request):
 
 
 @login_required
+@staff_required
 def members_center(request):
     from dashboard.forms import QuickMemberInviteForm
     from memberships.models import MemberInvitation
@@ -1195,6 +1203,7 @@ def members_center(request):
 
 
 @login_required
+@staff_required
 def simulations_center(request):
     context = _global_context(request)
     context["active_tab"] = "simulations"
@@ -1209,6 +1218,7 @@ def simulations_center(request):
 
 
 @login_required
+@staff_required
 def simulation_detail(request, simulation_id):
     """Fiche complète d'une simulation de quotité cessible."""
     simulation = get_object_or_404(
@@ -1245,6 +1255,7 @@ def simulation_detail(request, simulation_id):
 
 
 @login_required
+@staff_required
 def documents_center(request):
     context = _global_context(request)
     context["active_tab"] = "documents"
@@ -1258,6 +1269,7 @@ def documents_center(request):
 
 
 @login_required
+@staff_required
 def reports_center(request):
     context = _global_context(request)
     context["active_tab"] = "reports"
@@ -1265,6 +1277,7 @@ def reports_center(request):
 
 
 @login_required
+@staff_required
 def notifications_center(request):
     context = _global_context(request)
     context["active_tab"] = "notifications"
@@ -1278,6 +1291,7 @@ def notifications_center(request):
 
 
 @login_required
+@staff_required
 def field_offline_center(request):
     context = _global_context(request)
     context["active_tab"] = "offline"
@@ -1288,6 +1302,7 @@ def field_offline_center(request):
 
 
 @login_required
+@staff_required
 def ai_copilot_center(request):
     context = _global_context(request)
     context["active_tab"] = "ai"
@@ -1301,6 +1316,7 @@ def ai_copilot_center(request):
 
 
 @login_required
+@staff_required
 def governance_center(request):
     context = _global_context(request)
     context["active_tab"] = "governance"
@@ -1316,6 +1332,7 @@ def governance_center(request):
 
 
 @login_required
+@staff_required
 def branding_center(request):
     context = _global_context(request)
     context["active_tab"] = "branding"
@@ -1385,6 +1402,7 @@ def profile_center(request):
 
 
 @login_required
+@staff_required
 def finance_center(request):
     context = _global_context(request)
     context["active_tab"] = "finance"
@@ -1401,6 +1419,7 @@ def finance_center(request):
 
 
 @login_required
+@staff_required
 def financing_center(request):
     context = _global_context(request)
     context["active_tab"] = "financing"
@@ -1417,6 +1436,7 @@ def financing_center(request):
 
 
 @login_required
+@staff_required
 def claims_center(request):
     context = _global_context(request)
     context["active_tab"] = "claims"
@@ -1490,6 +1510,7 @@ def create_mutuelle(request):
 
 
 @login_required
+@staff_required
 def update_mutuelle_branding(request, mutuelle_id):
     mutuelle = get_object_or_404(Mutuelle, id=mutuelle_id)
     form = MutuelleBrandingForm(request.POST or None, request.FILES or None, instance=mutuelle)
@@ -1500,6 +1521,7 @@ def update_mutuelle_branding(request, mutuelle_id):
 
 
 @login_required
+@staff_required
 def member_detail(request, member_id):
     """Fiche complète d'un membre.
 
@@ -1577,6 +1599,7 @@ def member_detail(request, member_id):
 
 
 @login_required
+@staff_required
 @transaction.atomic
 def create_member(request):
     """Workflow d'enrôlement membre complet.
@@ -1621,6 +1644,7 @@ def create_member(request):
 # Import Excel / CSV
 # ===========================================================================
 @login_required
+@staff_required
 @transaction.atomic
 def import_members(request):
     """Import en masse de mutualistes depuis un fichier Excel (.xlsx) ou CSV.
@@ -1673,6 +1697,7 @@ def import_members(request):
 # Invitations par email
 # ===========================================================================
 @login_required
+@staff_required
 @transaction.atomic
 def send_member_invitations(request):
     """Saisit un lot d'emails et envoie une invitation à chacun.
@@ -1741,6 +1766,7 @@ INVITATION_DEFAULT_TTL_DAYS = 14
 
 
 @login_required
+@staff_required
 @require_POST
 @transaction.atomic
 def invite_member(request):
@@ -1815,6 +1841,7 @@ def _invitation_in_scope_or_404(request, invitation_id):
 
 
 @login_required
+@staff_required
 @require_POST
 @transaction.atomic
 def resend_member_invitation(request, invitation_id):
@@ -1840,6 +1867,7 @@ def resend_member_invitation(request, invitation_id):
 
 
 @login_required
+@staff_required
 @require_POST
 @transaction.atomic
 def cancel_member_invitation(request, invitation_id):
@@ -2299,6 +2327,7 @@ def invite_landing(request):
 
 
 @login_required
+@staff_required
 def create_financial_profile(request):
     """Création du profil financier d'un membre.
 
@@ -2360,6 +2389,7 @@ def create_financial_profile(request):
 
 @transaction.atomic
 @login_required
+@staff_required
 def create_project(request):
     form = ProjectCreateForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
@@ -2401,6 +2431,7 @@ def create_project(request):
 
 
 @login_required
+@staff_required
 def create_simulation(request):
     """Lance une simulation de quotité cessible pour un membre donné.
 
@@ -2481,6 +2512,7 @@ def create_simulation(request):
 
 
 @login_required
+@staff_required
 def create_financing_scenario_view(request):
     form = FinancingScenarioCreateForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
@@ -2499,6 +2531,7 @@ def create_financing_scenario_view(request):
 
 
 @login_required
+@staff_required
 def create_mortgage_application(request):
     from dashboard.forms import MortgageApplicationCreateForm
 
@@ -2513,6 +2546,7 @@ def create_mortgage_application(request):
 
 
 @login_required
+@staff_required
 def advance_mortgage_application(request, application_id):
     application = get_object_or_404(MortgageApplication.all_objects, id=application_id)
     transitions = {
@@ -2531,6 +2565,7 @@ def advance_mortgage_application(request, application_id):
 
 
 @login_required
+@staff_required
 def create_reservation(request):
     form = ReservationCreateForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
@@ -2546,6 +2581,7 @@ def create_reservation(request):
 
 
 @login_required
+@staff_required
 def create_contribution_plan(request):
     form = ContributionPlanCreateForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
@@ -2555,6 +2591,7 @@ def create_contribution_plan(request):
 
 
 @login_required
+@staff_required
 def create_contribution(request):
     form = ContributionCreateForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
@@ -2571,6 +2608,7 @@ def create_contribution(request):
 
 
 @login_required
+@staff_required
 def create_payment(request):
     form = PaymentCreateForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
@@ -2600,6 +2638,7 @@ def create_payment(request):
 
 
 @login_required
+@staff_required
 def simulate_payment_success(request, payment_id):
     payment = get_object_or_404(Payment.all_objects, id=payment_id)
     if request.method == "POST":
@@ -2608,6 +2647,7 @@ def simulate_payment_success(request, payment_id):
 
 
 @login_required
+@staff_required
 def create_assistance_claim(request):
     form = AssistanceClaimCreateForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
@@ -2621,6 +2661,7 @@ def create_assistance_claim(request):
 
 
 @login_required
+@staff_required
 def advance_assistance_claim(request, claim_id):
     claim = get_object_or_404(AssistanceClaim.all_objects, id=claim_id)
     if request.method == "POST":
@@ -2629,6 +2670,7 @@ def advance_assistance_claim(request, claim_id):
 
 
 @login_required
+@staff_required
 def upload_property_document(request):
     form = PropertyDocumentUploadForm(request.POST or None, request.FILES or None)
     if request.method == "POST" and form.is_valid():
@@ -2645,6 +2687,7 @@ def upload_property_document(request):
 
 
 @login_required
+@staff_required
 def process_property_document(request, document_id):
     document = get_object_or_404(PropertyDocument.all_objects, id=document_id)
     if request.method == "POST":
@@ -2653,6 +2696,7 @@ def process_property_document(request, document_id):
 
 
 @login_required
+@staff_required
 def create_notification(request):
     form = NotificationCreateForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
@@ -2670,6 +2714,7 @@ def create_notification(request):
 
 
 @login_required
+@staff_required
 def create_ai_decision_note(request):
     form = AIAnalysisCreateForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
@@ -2713,6 +2758,7 @@ def verify_mfa_challenge(request):
 
 
 @login_required
+@staff_required
 def create_assembly(request):
     form = GeneralAssemblyCreateForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
@@ -2722,6 +2768,7 @@ def create_assembly(request):
 
 
 @login_required
+@staff_required
 def create_resolution(request):
     form = ResolutionCreateForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
@@ -2733,6 +2780,7 @@ def create_resolution(request):
 
 
 @login_required
+@staff_required
 def mutuelle_report(request, mutuelle_id):
     mutuelle = get_object_or_404(Mutuelle, id=mutuelle_id)
     context = _mutuelle_context(mutuelle)
@@ -2744,6 +2792,7 @@ def mutuelle_report(request, mutuelle_id):
 
 
 @login_required
+@staff_required
 def mutuelle_report_pdf(request, mutuelle_id):
     mutuelle = get_object_or_404(Mutuelle, id=mutuelle_id)
     context = _mutuelle_context(mutuelle)
@@ -2754,6 +2803,7 @@ def mutuelle_report_pdf(request, mutuelle_id):
 
 
 @login_required
+@staff_required
 def contribution_receipt(request, contribution_id):
     contribution = get_object_or_404(
         Contribution.all_objects.select_related("mutuelle", "member", "plan"),
@@ -2769,6 +2819,7 @@ def contribution_receipt(request, contribution_id):
 
 
 @login_required
+@staff_required
 def finance_export_csv(request):
     response = HttpResponse(content_type="text/csv")
     response["Content-Disposition"] = 'attachment; filename="finances-dga-imo360.csv"'

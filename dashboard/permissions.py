@@ -85,6 +85,38 @@ def is_staff_role(role: str) -> bool:
     return role in {ROLE_SUPERADMIN, ROLE_MUTUELLE_ADMIN}
 
 
+def staff_required(view_func):
+    """Décorateur : réserve une vue console aux gestionnaires (superadmin,
+    admin mutuelle). Un mutualiste, un invité ou un anonyme est renvoyé vers
+    son espace applicatif (login, portail mutualiste, landing invité).
+
+    Un simple membre ne peut donc ni créer/inviter/importer des membres, ni
+    consulter les écrans de gestion ou les autres mutuelles.
+    """
+    from functools import wraps
+
+    @wraps(view_func)
+    def _wrapped(request, *args, **kwargs):
+        user = getattr(request, "user", None)
+        if user is None or not user.is_authenticated:
+            from django.contrib.auth.views import redirect_to_login
+
+            return redirect_to_login(request.get_full_path())
+        role = resolve_role(user)
+        if not is_staff_role(role):
+            from django.contrib import messages
+            from django.shortcuts import redirect
+
+            messages.warning(
+                request,
+                "Cet espace est réservé aux gestionnaires de la mutuelle.",
+            )
+            return redirect(resolve_home_url_name(role))
+        return view_func(request, *args, **kwargs)
+
+    return _wrapped
+
+
 def role_context_processor(request):
     """Injecte ``user_role`` et ``user_role_label`` dans tous les templates."""
     role = resolve_role(getattr(request, "user", None))
