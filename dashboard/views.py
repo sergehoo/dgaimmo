@@ -23,6 +23,15 @@ from accounts.services import (
     upsert_user_device,
     verify_otp_challenge,
 )
+from dashboard.permissions import (
+    ROLE_ANONYMOUS,
+    ROLE_INVITE,
+    ROLE_MUTUALISTE,
+    ROLE_MUTUELLE_ADMIN,
+    ROLE_SUPERADMIN,
+    resolve_role,
+    resolve_home_url_name,
+)
 from claims.models import AssistanceClaim
 from claims.services import advance_claim
 from contributions.models import Contribution, ContributionPlan
@@ -103,25 +112,13 @@ class SecureLoginView(LoginView):
         return super().form_invalid(form)
 
     def get_success_url(self):
-        """Routing par rôle : mutualiste → portail perso, sinon dashboard admin."""
+        """Routing par rôle applicatif (superadmin, admin, mutualiste, invité)."""
         # Respect explicite du ?next=... s'il est présent
         redirect_to = self.request.POST.get(self.redirect_field_name, self.request.GET.get(self.redirect_field_name, ""))
         if redirect_to:
             return super().get_success_url()
-        user = self.request.user
-        try:
-            has_member_profile = Member.all_objects.filter(user=user).exists()
-        except Exception:
-            has_member_profile = False
-        is_staff_of_mutuelle = (
-            user.is_superuser
-            or MutuelleMembership.objects.filter(user=user, active=True)
-            .exclude(role="member")
-            .exists()
-        )
-        if has_member_profile and not is_staff_of_mutuelle:
-            return reverse("member-portal")
-        return super().get_success_url()
+        role = resolve_role(self.request.user)
+        return reverse(resolve_home_url_name(role))
 
 
 def _user_accessible_mutuelles(user):
@@ -957,16 +954,15 @@ def submit_contact_request(request):
 
 @login_required
 def console_dashboard(request):
-    # Mutualiste sans rôle staff → portail personnel
-    user = request.user
-    is_staff_of_mutuelle = (
-        user.is_superuser
-        or MutuelleMembership.objects.filter(user=user, active=True)
-        .exclude(role="member")
-        .exists()
-    )
-    if not is_staff_of_mutuelle and Member.all_objects.filter(user=user).exists():
+    # Routing par rôle applicatif
+    role = resolve_role(request.user)
+    if role == ROLE_MUTUALISTE:
         return redirect("member-portal")
+    if role == ROLE_INVITE:
+        return redirect("invite-landing")
+    if role == ROLE_SUPERADMIN:
+        return redirect("platform-center")
+    # ROLE_MUTUELLE_ADMIN → console classique (tenant-scoped)
     context = _global_context(request)
     context.update(_mutuelle_context(_active_mutuelle(request)))
     context["active_tab"] = "dashboard"
@@ -975,10 +971,27 @@ def console_dashboard(request):
 
 @login_required
 def mutuelles_list(request):
-    """Liste des mutuelles accessibles à l'utilisateur (isolation tenant)."""
+    """Liste des mutuelles accessibles à l'utilisateur (isolation tenant).
+
+    Règle métier :
+    - Superadmin : voit toutes les mutuelles de la plateforme.
+    - Admin mutuelle : voit uniquement SA mutuelle → redirection directe vers
+      son détail (pas de liste inutile). S'il en a plusieurs, la liste s'affiche.
+    - Mutualiste / invité : redirigé vers leur home applicatif.
+    """
+    role = resolve_role(request.user)
+    if role in (ROLE_MUTUALISTE, ROLE_INVITE, ROLE_ANONYMOUS):
+        return redirect(resolve_home_url_name(role))
+
+    accessible = _user_accessible_mutuelles(request.user).order_by("name")
+
+    # Admin mutuelle avec une seule mutuelle → detail direct
+    if role == ROLE_MUTUELLE_ADMIN and accessible.count() == 1:
+        return redirect("mutuelle-detail", mutuelle_id=accessible.first().id)
+
     context = _global_context(request)
     context["active_tab"] = "mutuelles"
-    context["mutuelles"] = _user_accessible_mutuelles(request.user).order_by("name")
+    context["mutuelles"] = accessible
     return render(request, "dashboard/mutuelles_list.html", context)
 
 
@@ -2006,6 +2019,85 @@ def member_portal_referrals(request):
         "tenant_accent_color": (member.mutuelle.accent_color if member.mutuelle else "#0bbf63") or "#0bbf63",
     }
     return render(request, "dashboard/member_portal_referrals.html", context)
+
+
+# --- Superadmin : centre plateforme (cross-tenant) ---------------------------
+@login_required
+def platform_center(request):
+    """Vue globale plateforme réservée au SuperAdmin.
+
+    Agrège toutes les mutuelles + membres + cotisations sans filtrage tenant.
+    Les non-superadmin sont redirigés vers leur home applicatif.
+    """
+    role = resolve_role(request.user)
+    if role != ROLE_SUPERADMIN:
+        return redirect(resolve_home_url_name(role))
+
+    from contributions.models import Contribution
+    from real_estate.models import QuotiteCessibleSimulation
+
+    mutuelles = (
+        Mutuelle.objects.all()
+        .annotate(members_count=models.Count("members", distinct=True))
+        .order_by("-created_at")
+    )
+    total_mutuelles = mutuelles.count()
+    total_members = Member.all_objects.count()
+    total_contribs = Contribution.all_objects.count()
+    total_simulations = QuotiteCessibleSimulation.all_objects.count()
+    contribs_amount = (
+        Contribution.all_objects.aggregate(total=Sum("amount"))["total"] or Decimal("0")
+    )
+
+    context = {
+        "mutuelles": mutuelles[:50],
+        "total_mutuelles": total_mutuelles,
+        "total_members": total_members,
+        "total_contribs": total_contribs,
+        "total_simulations": total_simulations,
+        "contribs_amount": contribs_amount,
+        "active_tab": "platform",
+        "tenant_primary_color": "#0b55d9",
+        "tenant_accent_color": "#0bbf63",
+    }
+    return render(request, "dashboard/platform_center.html", context)
+
+
+# --- Invité / mandataire : landing en attente d'activation --------------------
+@login_required
+def invite_landing(request):
+    """Vue pour utilisateur connecté sans profil membre effectif ni rôle admin.
+
+    Deux cas :
+    1. Une invitation active existe pour son email → CTA pour la finaliser.
+    2. Aucune invitation → message "en attente" + contact admin.
+    """
+    from memberships.models import MemberInvitation
+
+    user = request.user
+    role = resolve_role(user)
+    if role == ROLE_MUTUALISTE:
+        return redirect("member-portal")
+    if role in (ROLE_MUTUELLE_ADMIN, ROLE_SUPERADMIN):
+        return redirect(resolve_home_url_name(role))
+
+    email = (user.email or "").strip().lower()
+    active_invites = (
+        MemberInvitation.all_objects
+        .filter(email=email)
+        .select_related("mutuelle")
+        .order_by("-created_at")[:5]
+    )
+    usable_invites = [inv for inv in active_invites if inv.is_usable]
+
+    context = {
+        "usable_invites": usable_invites,
+        "past_invites": [inv for inv in active_invites if not inv.is_usable],
+        "user": user,
+        "tenant_primary_color": "#0b55d9",
+        "tenant_accent_color": "#0bbf63",
+    }
+    return render(request, "dashboard/invite_landing.html", context)
 
 
 @login_required

@@ -4,23 +4,44 @@
 <div class="min-h-screen bg-[#f8fbff] text-[#06194a]" x-data="{ mobile:false, mobileGroup:'pilotage' }" style="--tenant-primary: {{ tenant_primary_color|default:'#0b55d9' }}; --tenant-accent: {{ tenant_accent_color|default:'#0bbf63' }};">
   <header class="sticky top-0 z-30 border-b border-[#e8eef8] bg-white/95 backdrop-blur">
     <div class="mx-auto flex h-16 max-w-[1440px] items-center justify-between gap-4 px-5">
-      <a href="/" class="flex shrink-0 items-center gap-2 no-underline">
+      <a href="{% if is_superadmin %}{% url 'platform-center' %}{% else %}{% url 'dashboard-home' %}{% endif %}" class="flex shrink-0 items-center gap-2 no-underline">
         <span>
           <img src="{% static 'img/logoDGAmutuelle.png' %}" width="150">
-
         </span>
       </a>
-      <nav class="hidden min-w-0 flex-1 items-center justify-center gap-1 text-sm font-extrabold text-[#172b5f] lg:flex">
-        <a class="rounded-xl px-4 py-2 {% if active_tab == 'dashboard' %}bg-[#eaf2ff] text-[#0b55d9]{% else %}hover:bg-[#f3f7ff]{% endif %}" href="{% url 'dashboard-home' %}">Tableau de bord</a>
 
-        <div class="relative" x-data="{ open:false }" @mouseenter="open=true" @mouseleave="open=false">
-          <button type="button" class="rounded-xl px-4 py-2 {% if active_tab == 'mutuelles' or active_tab == 'members' or active_tab == 'simulations' %}bg-[#eaf2ff] text-[#0b55d9]{% else %}hover:bg-[#f3f7ff]{% endif %}" @click="open=!open">Mutuelles ▾</button>
-          <div x-show="open" x-transition x-cloak class="absolute left-0 top-11 z-50 w-64 rounded-2xl border border-[#e1e9f7] bg-white p-2 shadow-xl">
-            <a class="block rounded-xl px-4 py-3 hover:bg-[#f3f7ff]" href="{% url 'mutuelles-list' %}">Liste des mutuelles</a>
-            <a class="block rounded-xl px-4 py-3 hover:bg-[#f3f7ff]" href="{% url 'members-center' %}">Membres</a>
-            <a class="block rounded-xl px-4 py-3 hover:bg-[#f3f7ff]" href="{% url 'simulations-center' %}">Quotité cessible</a>
+      <!-- Badge rôle actif (superadmin uniquement, discret) -->
+      {% if is_superadmin %}
+        <span class="hidden shrink-0 rounded-full bg-[#ffecec] px-3 py-1 text-xs font-black text-[#c93838] md:inline-flex"><i class="fa-solid fa-shield-halved mr-1"></i> {{ user_role_label }}</span>
+      {% elif is_mutuelle_admin and active_mutuelle %}
+        <span class="hidden shrink-0 rounded-full bg-[#eaf2ff] px-3 py-1 text-xs font-black text-[#0b55d9] md:inline-flex"><i class="fa-solid fa-building mr-1"></i> {{ active_mutuelle.name|truncatechars:24 }}</span>
+      {% endif %}
+
+      <nav class="hidden min-w-0 flex-1 items-center justify-center gap-1 text-sm font-extrabold text-[#172b5f] lg:flex">
+        <a class="rounded-xl px-4 py-2 {% if active_tab == 'dashboard' %}bg-[#eaf2ff] text-[#0b55d9]{% else %}hover:bg-[#f3f7ff]{% endif %}"
+           href="{% if is_superadmin %}{% url 'platform-center' %}{% else %}{% url 'dashboard-home' %}{% endif %}">
+          {% if is_superadmin %}Plateforme{% else %}Tableau de bord{% endif %}
+        </a>
+
+        {% if is_superadmin %}
+          {# --- SUPERADMIN : accès à toutes les mutuelles + tous les modules --- #}
+          <div class="relative" x-data="{ open:false }" @mouseenter="open=true" @mouseleave="open=false">
+            <button type="button" class="rounded-xl px-4 py-2 {% if active_tab == 'mutuelles' or active_tab == 'members' or active_tab == 'simulations' %}bg-[#eaf2ff] text-[#0b55d9]{% else %}hover:bg-[#f3f7ff]{% endif %}" @click="open=!open">Mutuelles ▾</button>
+            <div x-show="open" x-transition x-cloak class="absolute left-0 top-11 z-50 w-64 rounded-2xl border border-[#e1e9f7] bg-white p-2 shadow-xl">
+              <a class="block rounded-xl px-4 py-3 hover:bg-[#f3f7ff]" href="{% url 'mutuelles-list' %}">Toutes les mutuelles</a>
+              <a class="block rounded-xl px-4 py-3 hover:bg-[#f3f7ff]" href="{% url 'members-center' %}">Tous les membres</a>
+              <a class="block rounded-xl px-4 py-3 hover:bg-[#f3f7ff]" href="{% url 'simulations-center' %}">Quotité cessible</a>
+            </div>
           </div>
-        </div>
+        {% else %}
+          {# --- ADMIN MUTUELLE : uniquement SA mutuelle + ses membres --- #}
+          {% if active_mutuelle %}
+            <a class="rounded-xl px-4 py-2 {% if active_tab == 'mutuelles' %}bg-[#eaf2ff] text-[#0b55d9]{% else %}hover:bg-[#f3f7ff]{% endif %}" href="{% url 'mutuelle-detail' mutuelle_id=active_mutuelle.id %}">
+              <i class="fa-solid fa-building mr-1"></i> {{ active_mutuelle.name|truncatechars:22 }}
+            </a>
+          {% endif %}
+          <a class="rounded-xl px-4 py-2 {% if active_tab == 'members' %}bg-[#eaf2ff] text-[#0b55d9]{% else %}hover:bg-[#f3f7ff]{% endif %}" href="{% url 'members-center' %}"><i class="fa-solid fa-users mr-1"></i> Membres</a>
+        {% endif %}
 
         <div class="relative" x-data="{ open:false }" @mouseenter="open=true" @mouseleave="open=false">
           <button type="button" class="rounded-xl px-4 py-2 {% if active_tab == 'projects' or active_tab == 'financing' or active_tab == 'documents' %}bg-[#eaf2ff] text-[#0b55d9]{% else %}hover:bg-[#f3f7ff]{% endif %}" @click="open=!open">Immobilier ▾</button>
@@ -28,6 +49,7 @@
             <a class="block rounded-xl px-4 py-3 hover:bg-[#f3f7ff]" href="{% url 'projects-center' %}">Projets & opportunités</a>
             <a class="block rounded-xl px-4 py-3 hover:bg-[#f3f7ff]" href="{% url 'financing-center' %}">Financements immobiliers</a>
             <a class="block rounded-xl px-4 py-3 hover:bg-[#f3f7ff]" href="{% url 'documents-center' %}">Documents & OCR</a>
+            {% if not is_superadmin %}<a class="block rounded-xl px-4 py-3 hover:bg-[#f3f7ff]" href="{% url 'simulations-center' %}">Quotité cessible</a>{% endif %}
           </div>
         </div>
 
@@ -51,8 +73,12 @@
         </div>
 
         <div class="relative" x-data="{ open:false }" @mouseenter="open=true" @mouseleave="open=false">
-          <button type="button" class="rounded-xl px-4 py-2 {% if active_tab == 'branding' or active_tab == 'security' %}bg-[#eaf2ff] text-[#0b55d9]{% else %}hover:bg-[#f3f7ff]{% endif %}" @click="open=!open">Admin ▾</button>
+          <button type="button" class="rounded-xl px-4 py-2 {% if active_tab == 'branding' or active_tab == 'security' or active_tab == 'platform' %}bg-[#eaf2ff] text-[#0b55d9]{% else %}hover:bg-[#f3f7ff]{% endif %}" @click="open=!open">Admin ▾</button>
           <div x-show="open" x-transition x-cloak class="absolute right-0 top-11 z-50 w-60 rounded-2xl border border-[#e1e9f7] bg-white p-2 shadow-xl">
+            {% if is_superadmin %}
+              <a class="block rounded-xl px-4 py-3 hover:bg-[#f3f7ff] font-black text-[#c93838]" href="{% url 'platform-center' %}"><i class="fa-solid fa-shield-halved mr-1"></i> Plateforme</a>
+              <div class="my-1 h-px bg-[#e5edf8]"></div>
+            {% endif %}
             <a class="block rounded-xl px-4 py-3 hover:bg-[#f3f7ff]" href="{% url 'branding-center' %}">Branding mutuelle</a>
             <a class="block rounded-xl px-4 py-3 hover:bg-[#f3f7ff]" href="{% url 'security-center' %}">Sécurité</a>
           </div>
@@ -68,6 +94,7 @@
             <span class="hidden text-xs text-[#667899] md:block">▾</span>
           </button>
           <div x-show="open" x-transition x-cloak class="absolute right-0 top-12 z-50 w-64 rounded-2xl border border-[#e1e9f7] bg-white p-2 text-sm font-extrabold text-[#172b5f] shadow-xl">
+            <div class="mb-1 px-4 py-2 text-xs font-black uppercase tracking-[.14em] text-[#8095b8]">{{ user_role_label }}</div>
             <a class="block rounded-xl px-4 py-3 hover:bg-[#f3f7ff]" href="{% url 'profile-center' %}">Mon profil</a>
             <a class="block rounded-xl px-4 py-3 hover:bg-[#f3f7ff]" href="{% url 'security-center' %}">Sécurité du compte</a>
           </div>
@@ -76,14 +103,23 @@
       </div>
     </div>
     <nav x-show="mobile" x-cloak class="border-t border-[#e8eef8] bg-white px-5 py-4 text-sm font-extrabold text-[#172b5f] lg:hidden">
-      <a class="mb-3 block rounded-xl bg-[#f3f7ff] px-4 py-3" href="{% url 'dashboard-home' %}">Tableau de bord</a>
+      <a class="mb-3 block rounded-xl bg-[#f3f7ff] px-4 py-3" href="{% if is_superadmin %}{% url 'platform-center' %}{% else %}{% url 'dashboard-home' %}{% endif %}">
+        {% if is_superadmin %}Plateforme{% else %}Tableau de bord{% endif %}
+      </a>
       <div class="grid gap-2">
-        <button type="button" class="flex items-center justify-between rounded-xl bg-[#f8fbff] px-4 py-3 text-left" @click="mobileGroup = mobileGroup === 'mutuelles' ? '' : 'mutuelles'">Mutuelles <span>▾</span></button>
-        <div x-show="mobileGroup === 'mutuelles'" class="grid gap-1 pl-3">
-          <a class="rounded-lg px-4 py-2" href="{% url 'mutuelles-list' %}">Liste des mutuelles</a>
-          <a class="rounded-lg px-4 py-2" href="{% url 'members-center' %}">Membres</a>
-          <a class="rounded-lg px-4 py-2" href="{% url 'simulations-center' %}">Quotité cessible</a>
-        </div>
+        {% if is_superadmin %}
+          <button type="button" class="flex items-center justify-between rounded-xl bg-[#f8fbff] px-4 py-3 text-left" @click="mobileGroup = mobileGroup === 'mutuelles' ? '' : 'mutuelles'">Mutuelles <span>▾</span></button>
+          <div x-show="mobileGroup === 'mutuelles'" class="grid gap-1 pl-3">
+            <a class="rounded-lg px-4 py-2" href="{% url 'mutuelles-list' %}">Toutes les mutuelles</a>
+            <a class="rounded-lg px-4 py-2" href="{% url 'members-center' %}">Tous les membres</a>
+            <a class="rounded-lg px-4 py-2" href="{% url 'simulations-center' %}">Quotité cessible</a>
+          </div>
+        {% else %}
+          {% if active_mutuelle %}
+            <a class="rounded-xl bg-[#f8fbff] px-4 py-3" href="{% url 'mutuelle-detail' mutuelle_id=active_mutuelle.id %}"><i class="fa-solid fa-building mr-1"></i> {{ active_mutuelle.name }}</a>
+          {% endif %}
+          <a class="rounded-xl bg-[#f8fbff] px-4 py-3" href="{% url 'members-center' %}"><i class="fa-solid fa-users mr-1"></i> Membres</a>
+        {% endif %}
         <button type="button" class="flex items-center justify-between rounded-xl bg-[#f8fbff] px-4 py-3 text-left" @click="mobileGroup = mobileGroup === 'immobilier' ? '' : 'immobilier'">Immobilier <span>▾</span></button>
         <div x-show="mobileGroup === 'immobilier'" class="grid gap-1 pl-3">
           <a class="rounded-lg px-4 py-2" href="{% url 'projects-center' %}">Projets & opportunités</a>
@@ -105,6 +141,7 @@
         </div>
         <button type="button" class="flex items-center justify-between rounded-xl bg-[#f8fbff] px-4 py-3 text-left" @click="mobileGroup = mobileGroup === 'admin' ? '' : 'admin'">Admin <span>▾</span></button>
         <div x-show="mobileGroup === 'admin'" class="grid gap-1 pl-3">
+          {% if is_superadmin %}<a class="rounded-lg px-4 py-2 text-[#c93838] font-black" href="{% url 'platform-center' %}">🛡 Plateforme</a>{% endif %}
           <a class="rounded-lg px-4 py-2" href="{% url 'profile-center' %}">Mon profil</a>
           <a class="rounded-lg px-4 py-2" href="{% url 'branding-center' %}">Branding mutuelle</a>
           <a class="rounded-lg px-4 py-2" href="{% url 'security-center' %}">Sécurité</a>

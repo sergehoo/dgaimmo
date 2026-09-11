@@ -1,0 +1,79 @@
+{% extends "base/app.html" %}
+{% load static %}
+{% block content %}
+<div class="min-h-screen bg-[#f7fbff] text-[#06194a]">
+  <header class="border-b border-[#e8eef8] bg-white">
+    <div class="mx-auto flex h-16 max-w-[1240px] items-center justify-between gap-4 px-4">
+      <a href="{% url 'landing-page' %}" class="flex items-center gap-2 no-underline">
+        <img src="{% static 'img/logoDGAmutuelle.png' %}" width="140" alt="DGA Mutuelle">
+      </a>
+      <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="rounded-lg bg-[#f3f7ff] px-3 py-2 text-xs font-black text-[#536484]"><i class="fa-solid fa-arrow-right-from-bracket mr-1"></i>Sortir</button></form>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-[720px] px-4 py-10">
+    {% if usable_invites %}
+      <section class="rounded-3xl border border-emerald-100 bg-emerald-50/60 p-8 shadow-lg shadow-emerald-900/5">
+        <span class="grid h-16 w-16 place-items-center rounded-3xl bg-white text-3xl text-emerald-600"><i class="fa-solid fa-envelope-open-text"></i></span>
+        <h1 class="mt-6 text-3xl font-black">Vous avez {{ usable_invites|length }} invitation{{ usable_invites|length|pluralize }} en attente</h1>
+        <p class="mt-2 text-sm font-bold text-[#536484]">Une ou plusieurs mutuelles souhaitent vous compter parmi leurs membres. Finalisez votre profil pour rejoindre.</p>
+
+        <div class="mt-6 grid gap-4">
+          {% for inv in usable_invites %}
+            <div class="rounded-2xl border border-emerald-200 bg-white p-5">
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <p class="text-xs font-black uppercase tracking-[.14em] text-emerald-700">Mutuelle</p>
+                  <h3 class="mt-1 text-xl font-black">{{ inv.mutuelle.name }}</h3>
+                  {% if inv.message %}<p class="mt-2 text-sm font-semibold text-[#536484]"><i class="fa-solid fa-quote-left mr-1"></i>{{ inv.message|truncatechars:160 }}</p>{% endif %}
+                  <p class="mt-3 text-xs font-bold text-[#536484]"><i class="fa-solid fa-clock mr-1"></i> Expire le {{ inv.expires_at|date:"d/m/Y à H:i" }}</p>
+                </div>
+                <a href="{% url 'accept-member-invitation' token=inv.token %}" class="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white shadow-lg hover:bg-emerald-700">
+                  <i class="fa-solid fa-arrow-right"></i> Finaliser
+                </a>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </section>
+    {% else %}
+      <section class="rounded-3xl border border-[#e5edf8] bg-white p-8 shadow-lg shadow-blue-950/5 text-center">
+        <span class="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-[#fff4e5] text-3xl text-[#b56a00]"><i class="fa-solid fa-hourglass-half"></i></span>
+        <h1 class="mt-6 text-3xl font-black">En attente d'activation</h1>
+        <p class="mt-3 text-sm font-bold text-[#536484]">Votre compte est créé mais n'est rattaché à aucune mutuelle active. Vous êtes en mode <b>invité / mandataire</b>.</p>
+        <div class="mt-6 rounded-2xl bg-[#f7faff] p-5 text-left text-sm font-bold text-[#536484] ring-1 ring-[#edf2fb]">
+          <p class="mb-2 text-[#06194a]"><i class="fa-solid fa-lightbulb text-[#b56a00] mr-1"></i> Que faire maintenant ?</p>
+          <ul class="ml-4 list-disc space-y-1">
+            <li>Contactez l'administrateur de la mutuelle qui doit vous inviter.</li>
+            <li>Demandez-lui de vous envoyer un lien d'invitation à <b class="text-[#0b55d9]">{{ user.email }}</b>.</li>
+            <li>Une fois reçu, revenez sur cette page pour finaliser votre adhésion.</li>
+          </ul>
+        </div>
+      </section>
+    {% endif %}
+
+    {% if past_invites %}
+      <section class="mt-6 rounded-3xl border border-[#e5edf8] bg-white p-6">
+        <h2 class="text-sm font-black uppercase tracking-[.14em] text-[#536484]">Invitations passées</h2>
+        <div class="mt-3 grid gap-2">
+          {% for inv in past_invites %}
+            <div class="flex items-center justify-between rounded-xl bg-[#f7faff] p-3 text-xs font-bold text-[#536484] ring-1 ring-[#edf2fb]">
+              <span>{{ inv.mutuelle.name }}</span>
+              <span class="rounded-full px-3 py-1
+                {% if inv.status == 'accepted' %}bg-emerald-100 text-emerald-700
+                {% elif inv.status == 'expired' %}bg-amber-100 text-amber-700
+                {% else %}bg-red-100 text-red-700{% endif %}">
+                {{ inv.get_status_display }}
+              </span>
+            </div>
+          {% endfor %}
+        </div>
+      </section>
+    {% endif %}
+
+    <div class="mt-8 text-center">
+      <a href="{% url 'landing-page' %}" class="inline-flex items-center gap-2 text-sm font-black text-[#0b55d9] hover:underline"><i class="fa-solid fa-arrow-left"></i> Retour à l'accueil</a>
+    </div>
+  </main>
+</div>
+{% endblock %}

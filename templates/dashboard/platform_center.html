@@ -1,0 +1,112 @@
+{% extends "dashboard/console_base.html" %}
+{% load humanize %}
+{% block console_content %}
+<div class="grid gap-6">
+  <!-- Hero superadmin -->
+  <section class="rounded-[28px] border border-[#e5edf8] bg-gradient-to-br from-[#eef5ff] via-white to-[#e9fff3] p-6 shadow-xl shadow-blue-950/5 md:p-10">
+    <div class="flex flex-wrap items-start justify-between gap-4">
+      <div>
+        <p class="text-xs font-black uppercase tracking-[.14em] text-[#c93838]"><i class="fa-solid fa-shield-halved mr-1"></i> Super administrateur</p>
+        <h1 class="mt-2 text-3xl font-black md:text-4xl">Plateforme DGA Mutuelle</h1>
+        <p class="mt-2 text-sm font-bold leading-6 text-[#536484]">Vue transversale de toutes les mutuelles du réseau. Vous voyez les données de tous les tenants.</p>
+      </div>
+      <a href="{% url 'create-mutuelle' %}" class="inline-flex items-center gap-2 rounded-2xl bg-[#c93838] px-5 py-3 text-sm font-black text-white shadow-lg shadow-red-900/20"><i class="fa-solid fa-plus"></i> Nouvelle mutuelle</a>
+    </div>
+  </section>
+
+  <!-- KPI globaux -->
+  <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+    <div class="rounded-3xl border border-[#e5edf8] bg-white p-5">
+      <p class="text-xs font-black uppercase tracking-[.14em] text-[#536484]">Mutuelles</p>
+      <p class="mt-2 text-2xl font-black text-[#0b55d9]">{{ total_mutuelles|intcomma }}</p>
+      <p class="mt-1 text-xs font-bold text-[#536484]">actives sur la plateforme</p>
+    </div>
+    <div class="rounded-3xl border border-[#e5edf8] bg-white p-5">
+      <p class="text-xs font-black uppercase tracking-[.14em] text-[#536484]">Membres</p>
+      <p class="mt-2 text-2xl font-black text-[#0aa25f]">{{ total_members|intcomma }}</p>
+      <p class="mt-1 text-xs font-bold text-[#536484]">tous tenants confondus</p>
+    </div>
+    <div class="rounded-3xl border border-[#e5edf8] bg-white p-5">
+      <p class="text-xs font-black uppercase tracking-[.14em] text-[#536484]">Cotisations</p>
+      <p class="mt-2 text-2xl font-black text-[#5b3fd8]">{{ total_contribs|intcomma }}</p>
+      <p class="mt-1 text-xs font-bold text-[#536484]">écritures enregistrées</p>
+    </div>
+    <div class="rounded-3xl border border-[#e5edf8] bg-white p-5">
+      <p class="text-xs font-black uppercase tracking-[.14em] text-[#536484]">Simulations</p>
+      <p class="mt-2 text-2xl font-black text-[#b56a00]">{{ total_simulations|intcomma }}</p>
+      <p class="mt-1 text-xs font-bold text-[#536484]">quotités calculées</p>
+    </div>
+    <div class="rounded-3xl border border-[#e5edf8] bg-white p-5">
+      <p class="text-xs font-black uppercase tracking-[.14em] text-[#536484]">Volume cotisations</p>
+      <p class="mt-2 text-2xl font-black text-[#0b55d9]">{{ contribs_amount|floatformat:0|intcomma }}</p>
+      <p class="mt-1 text-xs font-bold text-[#536484]">FCFA cumulés</p>
+    </div>
+  </section>
+
+  <!-- Liste de toutes les mutuelles (cross-tenant) -->
+  <section class="rounded-3xl border border-[#e5edf8] bg-white p-6">
+    <div class="mb-4 flex items-center justify-between">
+      <div>
+        <h2 class="text-lg font-black">Toutes les mutuelles</h2>
+        <p class="text-xs font-bold text-[#536484]">Vue exhaustive plateforme (limite 50 dernières)</p>
+      </div>
+      <span class="rounded-full bg-[#ffecec] px-3 py-1 text-xs font-black text-[#c93838]">{{ total_mutuelles }} tenant·s</span>
+    </div>
+    {% if mutuelles %}
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-sm">
+          <thead>
+            <tr class="text-left text-xs font-black uppercase tracking-[.12em] text-[#536484]">
+              <th class="px-4 py-3">Mutuelle</th>
+              <th class="px-4 py-3">Organisation</th>
+              <th class="px-4 py-3">Membres</th>
+              <th class="px-4 py-3">Statut</th>
+              <th class="px-4 py-3">Créée le</th>
+              <th class="px-4 py-3 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for m in mutuelles %}
+              <tr class="border-t border-[#edf2fb]">
+                <td class="px-4 py-3">
+                  <div class="flex items-center gap-3">
+                    <span class="grid h-10 w-10 place-items-center rounded-xl text-xs font-black text-white" style="background: {{ m.primary_color|default:'#0b55d9' }}">
+                      {{ m.name|slice:":1"|upper }}
+                    </span>
+                    <div>
+                      <p class="font-black">{{ m.name }}</p>
+                      <p class="text-xs font-bold text-[#8095b8]">{{ m.slug }}</p>
+                    </div>
+                  </div>
+                </td>
+                <td class="px-4 py-3 font-bold text-[#536484]">{{ m.organization_name|default:'—' }}</td>
+                <td class="px-4 py-3 font-bold text-[#0b55d9]">{{ m.members_count|default:0 }}</td>
+                <td class="px-4 py-3">
+                  <span class="rounded-full px-3 py-1 text-xs font-black
+                    {% if m.status == 'active' %}bg-emerald-100 text-emerald-700
+                    {% elif m.status == 'suspended' %}bg-red-100 text-red-700
+                    {% else %}bg-blue-100 text-blue-700{% endif %}">
+                    {{ m.get_status_display }}
+                  </span>
+                </td>
+                <td class="px-4 py-3 font-bold text-[#536484]">{{ m.created_at|date:"d/m/Y" }}</td>
+                <td class="px-4 py-3 text-right">
+                  <a href="{% url 'mutuelle-detail' mutuelle_id=m.id %}" class="inline-flex items-center gap-1 rounded-xl bg-[#eaf2ff] px-3 py-2 text-xs font-black text-[#0b55d9] hover:bg-[#dae7fb]">
+                    <i class="fa-solid fa-arrow-up-right-from-square"></i> Ouvrir
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="rounded-2xl bg-[#f7faff] p-10 text-center text-sm font-bold text-[#536484]">
+        <i class="fa-regular fa-folder-open mb-3 text-4xl text-[#8095b8]"></i>
+        <p class="text-base font-black text-[#06194a]">Aucune mutuelle sur la plateforme</p>
+        <p class="mt-1">Créez la première mutuelle pour amorcer le réseau.</p>
+      </div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

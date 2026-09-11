@@ -12,6 +12,8 @@ from dashboard.views import (
     referral_signup,
     member_portal,
     member_portal_referrals,
+    platform_center,
+    invite_landing,
     branding_center,
     claims_center,
     console_dashboard,
@@ -146,6 +148,10 @@ urlpatterns = [
     # Espace mutualiste (portail)
     path("espace/", member_portal, name="member-portal"),
     path("espace/parrainage/", member_portal_referrals, name="member-portal-referrals"),
+    # Espace invité / mandataire
+    path("invite/", invite_landing, name="invite-landing"),
+    # Espace superadmin plateforme (cross-tenant)
+    path("console/plateforme/", platform_center, name="platform-center"),
     path("console/profils-financiers/nouveau/", create_financial_profile, name="create-financial-profile"),
     path("console/projets/nouveau/", create_project, name="create-project"),
     path("console/simulations/nouvelle/", create_simulation, name="create-simulation"),

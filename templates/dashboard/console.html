@@ -6,7 +6,11 @@
       <h1 class="mt-2 text-3xl font-black md:text-4xl">Tableau de bord</h1>
     </div>
     <div class="flex flex-wrap items-center gap-3">
-      <a href="{% url 'create-mutuelle' %}" class="rounded-xl px-4 py-3 text-sm font-black text-white shadow-sm" style="background: var(--tenant-primary)">+ Nouvelle mutuelle</a>
+      {% if is_superadmin %}
+        <a href="{% url 'create-mutuelle' %}" class="rounded-xl px-4 py-3 text-sm font-black text-white shadow-sm" style="background: var(--tenant-primary)">+ Nouvelle mutuelle</a>
+      {% else %}
+        <a href="{% url 'create-member' %}" class="rounded-xl px-4 py-3 text-sm font-black text-white shadow-sm" style="background: var(--tenant-primary)"><i class="fa-solid fa-user-plus mr-1"></i> Ajouter un membre</a>
+      {% endif %}
       <a href="{% url 'reports-center' %}" class="rounded-xl border border-[#dbe7f7] bg-white px-4 py-3 text-sm font-black text-[#10245a]">Rapports</a>
     </div>
   </div>

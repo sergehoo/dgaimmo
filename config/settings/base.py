@@ -296,6 +296,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "dashboard.permissions.role_context_processor",
             ],
             "builtins": ["django.contrib.humanize.templatetags.humanize"],
         },
