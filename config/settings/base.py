@@ -359,6 +359,13 @@ LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "dashboard-home"
 LOGOUT_REDIRECT_URL = "landing-page"
 
+# --- Email par défaut ---
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "DGA Mutuelle <no-reply@dgamutuelle.com>")
+SERVER_EMAIL = os.getenv("SERVER_EMAIL", DEFAULT_FROM_EMAIL)
+
+# --- Password reset (60 minutes) ---
+PASSWORD_RESET_TIMEOUT = int(os.getenv("PASSWORD_RESET_TIMEOUT", str(60 * 60)))
+
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
@@ -421,7 +428,10 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"]
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+STATICFILES_STORAGE = os.getenv(
+    "STATICFILES_STORAGE",
+    "whitenoise.storage.CompressedManifestStaticFilesStorage",
+)
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
 

@@ -1,0 +1,105 @@
+{% extends "base/app.html" %}
+{% load static humanize %}
+{% block content %}
+<div class="min-h-screen bg-[#f8fbff] text-[#06194a]" style="--tenant-primary: {{ tenant_primary_color|default:'#0b55d9' }}; --tenant-accent: {{ tenant_accent_color|default:'#0bbf63' }};">
+  <header class="sticky top-0 z-30 border-b border-[#e8eef8] bg-white/95 backdrop-blur">
+    <div class="mx-auto flex h-16 max-w-[1240px] items-center justify-between gap-4 px-4">
+      <a href="{% url 'landing-page' %}" class="flex shrink-0 items-center gap-2 no-underline">
+        <img src="{% static 'img/logoDGAmutuelle.png' %}" width="150" alt="DGA Mutuelle">
+      </a>
+      <nav class="hidden gap-2 text-sm font-black text-[#172b5f] md:flex">
+        <a href="{% url 'member-portal' %}" class="rounded-xl px-4 py-2 hover:bg-[#f3f7ff]">Mon espace</a>
+        <a href="{% url 'member-portal-referrals' %}" class="rounded-xl bg-[#eaf2ff] px-4 py-2 text-[#0b55d9]">Parrainage</a>
+        <a href="{% url 'profile-center' %}" class="rounded-xl px-4 py-2 hover:bg-[#f3f7ff]">Profil</a>
+      </nav>
+      <div class="flex shrink-0 items-center gap-3">
+        <span class="grid h-9 w-9 place-items-center rounded-full text-xs font-black text-white" style="background: var(--tenant-primary)">{{ member.first_name|first }}{{ member.last_name|first }}</span>
+        <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="rounded-lg bg-[#f3f7ff] px-3 py-2 text-xs font-black text-[#536484]">Sortir</button></form>
+      </div>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-[1240px] px-4 py-8">
+    <section class="grid gap-6 rounded-[28px] border border-white/60 bg-gradient-to-br from-[#eef5ff] via-white to-[#e9fff3] p-6 shadow-xl shadow-blue-950/5 md:grid-cols-[1.2fr_.8fr] md:p-10">
+      <div>
+        <p class="text-xs font-black uppercase tracking-[.14em]" style="color: var(--tenant-primary)"><i class="fa-solid fa-people-arrows mr-1"></i> Parrainage</p>
+        <h1 class="mt-2 text-3xl font-black md:text-4xl">Faites grandir votre mutuelle</h1>
+        <p class="mt-2 text-sm font-bold leading-6 text-[#536484]">Partagez votre lien avec vos proches. Chaque nouvelle inscription vous est attribuée automatiquement, et vous permet de contribuer à la solidité de votre communauté.</p>
+      </div>
+      <div class="rounded-3xl border border-white/70 bg-white/80 p-5 shadow-inner">
+        <p class="text-xs font-black uppercase tracking-[.14em] text-[#536484]">Total filleuls</p>
+        <p class="mt-1 text-3xl font-black" style="color: var(--tenant-primary)">{{ referrals_count }}</p>
+        <p class="mt-4 text-xs font-black uppercase tracking-[.14em] text-[#536484]">Filleuls actifs</p>
+        <p class="mt-1 text-2xl font-black text-emerald-600">{{ active_referrals_count }}</p>
+      </div>
+    </section>
+
+    <section class="mt-6 rounded-3xl border border-[#e5edf8] bg-white p-6" x-data="{ copied: false, copyLink() { navigator.clipboard.writeText('{{ referral_url|escapejs }}').then(() => { this.copied = true; setTimeout(() => this.copied = false, 2000); }); } }">
+      <div class="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p class="text-xs font-black uppercase tracking-[.14em]" style="color: var(--tenant-primary)">Mon lien</p>
+          <p class="mt-2 text-sm font-bold text-[#536484]">Code : <span class="font-mono text-[#0b55d9]">{{ member.referral_code }}</span></p>
+        </div>
+      </div>
+      <div class="mt-4 flex flex-wrap items-center gap-3">
+        <input class="min-h-[48px] flex-1 rounded-xl border border-[#dbe6f5] bg-[#f8fbff] px-4 text-sm font-bold text-[#0b55d9]" value="{{ referral_url }}" readonly onclick="this.select()">
+        <button type="button" @click="copyLink()" class="inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-black text-white shadow-lg" style="background: var(--tenant-primary);">
+          <template x-if="!copied"><span><i class="fa-solid fa-copy mr-1"></i> Copier</span></template>
+          <template x-if="copied"><span><i class="fa-solid fa-check mr-1"></i> Copié !</span></template>
+        </button>
+        <a href="mailto:?subject={{ mutuelle.name|urlencode }}%20-%20Invitation&body=Rejoignez%20la%20mutuelle%20via%20ce%20lien%20:%20{{ referral_url|urlencode }}" class="inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-black text-[#06337d] shadow-lg ring-1 ring-[#e5edf8]"><i class="fa-regular fa-envelope"></i> Par email</a>
+        <a href="https://wa.me/?text={{ mutuelle.name|urlencode }}%20-%20Rejoignez-nous%20:%20{{ referral_url|urlencode }}" target="_blank" rel="noopener" class="inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-black text-[#06337d] shadow-lg ring-1 ring-[#e5edf8]"><i class="fa-brands fa-whatsapp text-emerald-500"></i> WhatsApp</a>
+      </div>
+    </section>
+
+    <section class="mt-6 rounded-3xl border border-[#e5edf8] bg-white p-6">
+      <div class="mb-4 flex items-center justify-between">
+        <h2 class="text-lg font-black">Historique des filleuls</h2>
+        <span class="rounded-full bg-[#eaf2ff] px-3 py-1 text-xs font-black text-[#0b55d9]">{{ referrals_count }} au total</span>
+      </div>
+      {% if referrals %}
+        <div class="overflow-x-auto">
+          <table class="min-w-full text-sm">
+            <thead>
+              <tr class="text-left text-xs font-black uppercase tracking-[.12em] text-[#536484]">
+                <th class="px-4 py-3">Filleul</th>
+                <th class="px-4 py-3">Statut</th>
+                <th class="px-4 py-3">Date d'adhésion</th>
+                <th class="px-4 py-3">Code membre</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in referrals %}
+                <tr class="border-t border-[#edf2fb]">
+                  <td class="px-4 py-3 font-black">{{ r.first_name }} {{ r.last_name }}</td>
+                  <td class="px-4 py-3">
+                    <span class="rounded-full px-3 py-1 text-xs font-black
+                      {% if r.status == 'active' %}bg-emerald-100 text-emerald-700
+                      {% elif r.status == 'prospect' %}bg-blue-100 text-blue-700
+                      {% elif r.status == 'delinquent' %}bg-amber-100 text-amber-700
+                      {% else %}bg-red-100 text-red-700{% endif %}">
+                      {{ r.get_status_display }}
+                    </span>
+                  </td>
+                  <td class="px-4 py-3 font-bold text-[#536484]">{{ r.created_at|date:"d/m/Y" }}</td>
+                  <td class="px-4 py-3 font-mono text-xs text-[#0b55d9]">{{ r.member_code }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="rounded-2xl bg-[#f7faff] p-10 text-center text-sm font-bold text-[#536484]">
+          <i class="fa-regular fa-user-plus mb-3 text-4xl text-[#8095b8]"></i>
+          <p class="text-base font-black text-[#06194a]">Aucun filleul pour le moment</p>
+          <p class="mt-1">Partagez votre lien pour inviter votre premier filleul !</p>
+        </div>
+      {% endif %}
+    </section>
+
+    <div class="mt-6">
+      <a href="{% url 'member-portal' %}" class="inline-flex items-center gap-2 text-sm font-black text-[#0b55d9] hover:underline"><i class="fa-solid fa-arrow-left"></i> Retour à mon espace</a>
+    </div>
+  </main>
+</div>
+{% endblock %}

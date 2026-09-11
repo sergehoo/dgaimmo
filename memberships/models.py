@@ -152,6 +152,26 @@ class Member(TenantModel):
     kyc_validated = models.BooleanField(default=False, db_index=True)
     metadata = models.JSONField(default=dict, blank=True)
 
+    # ---- Parrainage ----
+    referral_code = models.CharField(
+        "Code de parrainage",
+        max_length=24,
+        unique=True,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Code unique généré à l'adhésion, partageable pour parrainer d'autres membres.",
+    )
+    referred_by = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="referrals",
+        verbose_name="Parrain",
+        help_text="Membre qui a parrainé ce mutualiste (via un lien de parrainage).",
+    )
+
     class Meta:
         unique_together = [("mutuelle", "member_code")]
         indexes = [
@@ -203,6 +223,39 @@ class Member(TenantModel):
     @property
     def real_estate_objectives_display(self) -> str:
         return " · ".join(self.real_estate_objectives_labels)
+
+    # ---- Parrainage ---------------------------------------------------------
+    def ensure_referral_code(self) -> str:
+        """Génère un code de parrainage unique si absent. Retourne le code."""
+        if self.referral_code:
+            return self.referral_code
+        import secrets as _s
+
+        while True:
+            candidate = _s.token_urlsafe(6).replace("-", "").replace("_", "").upper()[:8]
+            if not Member.all_objects.filter(referral_code=candidate).exists():
+                break
+        self.referral_code = candidate
+        self.save(update_fields=["referral_code"])
+        return self.referral_code
+
+    def referral_url(self, request=None) -> str:
+        """URL absolue de partage du lien de parrainage."""
+        from django.urls import reverse
+
+        code = self.ensure_referral_code()
+        path = reverse("referral-signup", kwargs={"code": code})
+        if request is not None:
+            return request.build_absolute_uri(path)
+        return path
+
+    @property
+    def referrals_count(self) -> int:
+        return self.referrals.count()
+
+    @property
+    def active_referrals_count(self) -> int:
+        return self.referrals.filter(status=Member.Status.ACTIVE).count()
 
 
 class Beneficiary(TenantModel):

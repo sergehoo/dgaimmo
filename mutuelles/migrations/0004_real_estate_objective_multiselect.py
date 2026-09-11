@@ -119,6 +119,26 @@ $$;
 NOOP_SQL = "SELECT 1;"
 
 
+def _guarded_runsql(pg_sql: str, reverse_pg_sql: str):
+    """Renvoie deux callables (forward, reverse) qui n'exécutent le SQL PostgreSQL
+    conditionnel (DO $$...$$) que si la base cible est PostgreSQL. Sur SQLite,
+    on renvoie un no-op — utile pour les tests locaux/dev sans PostGIS."""
+
+    def _forward(apps, schema_editor):
+        if schema_editor.connection.vendor == "postgresql":
+            schema_editor.execute(pg_sql)
+
+    def _reverse(apps, schema_editor):
+        if schema_editor.connection.vendor == "postgresql":
+            schema_editor.execute(reverse_pg_sql)
+
+    return _forward, _reverse
+
+
+_rename_fwd, _rename_rev = _guarded_runsql(RENAME_ORG_INDEX_SQL, REVERSE_RENAME_ORG_INDEX_SQL)
+_drop_fwd, _drop_rev = _guarded_runsql(DROP_REOBJ_INDEX_SQL, NOOP_SQL)
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -133,10 +153,7 @@ class Migration(migrations.Migration):
         # ---------------------------------------------------------------
         migrations.SeparateDatabaseAndState(
             database_operations=[
-                migrations.RunSQL(
-                    sql=RENAME_ORG_INDEX_SQL,
-                    reverse_sql=REVERSE_RENAME_ORG_INDEX_SQL,
-                ),
+                migrations.RunPython(_rename_fwd, _rename_rev),
             ],
             state_operations=[
                 migrations.RenameIndex(
@@ -165,7 +182,7 @@ class Migration(migrations.Migration):
         # ---------------------------------------------------------------
         migrations.SeparateDatabaseAndState(
             database_operations=[
-                migrations.RunSQL(sql=DROP_REOBJ_INDEX_SQL, reverse_sql=NOOP_SQL),
+                migrations.RunPython(_drop_fwd, _drop_rev),
             ],
             state_operations=[
                 migrations.RemoveIndex(

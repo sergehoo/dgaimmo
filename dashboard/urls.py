@@ -1,8 +1,17 @@
-from django.urls import path
-from django.contrib.auth.views import LogoutView
+from django.urls import path, reverse_lazy
+from django.contrib.auth.views import (
+    LogoutView,
+    PasswordResetView,
+    PasswordResetDoneView,
+    PasswordResetConfirmView,
+    PasswordResetCompleteView,
+)
 
 from dashboard.views import (
     ai_copilot_center,
+    referral_signup,
+    member_portal,
+    member_portal_referrals,
     branding_center,
     claims_center,
     console_dashboard,
@@ -72,6 +81,40 @@ urlpatterns = [
     path("creer-une-mutuelle/", public_mutuelle_signup, name="public-mutuelle-signup"),
     path("connexion/", SecureLoginView.as_view(), name="login"),
     path("deconnexion/", LogoutView.as_view(), name="logout"),
+    # -- Mot de passe oublié (vues Django built-in + templates FR premium)
+    path(
+        "mot-de-passe-oublie/",
+        PasswordResetView.as_view(
+            template_name="dashboard/password_reset_form.html",
+            email_template_name="emails/password_reset_email.txt",
+            html_email_template_name="emails/password_reset_email.html",
+            subject_template_name="emails/password_reset_subject.txt",
+            success_url=reverse_lazy("password_reset_done"),
+        ),
+        name="password_reset",
+    ),
+    path(
+        "mot-de-passe-oublie/envoye/",
+        PasswordResetDoneView.as_view(
+            template_name="dashboard/password_reset_done.html",
+        ),
+        name="password_reset_done",
+    ),
+    path(
+        "mot-de-passe-oublie/valider/<uidb64>/<token>/",
+        PasswordResetConfirmView.as_view(
+            template_name="dashboard/password_reset_confirm.html",
+            success_url=reverse_lazy("password_reset_complete"),
+        ),
+        name="password_reset_confirm",
+    ),
+    path(
+        "mot-de-passe-oublie/termine/",
+        PasswordResetCompleteView.as_view(
+            template_name="dashboard/password_reset_complete.html",
+        ),
+        name="password_reset_complete",
+    ),
     path("console/", console_dashboard, name="dashboard-home"),
     path("console/mutuelles/", mutuelles_list, name="mutuelles-list"),
     path("console/mutuelles/<uuid:mutuelle_id>/", mutuelle_detail, name="mutuelle-detail"),
@@ -98,6 +141,11 @@ urlpatterns = [
     path("console/membres/importer/", import_members, name="import-members"),
     path("console/membres/inviter/", send_member_invitations, name="send-member-invitations"),
     path("rejoindre/<str:token>/", accept_member_invitation, name="accept-member-invitation"),
+    # Parrainage public
+    path("parrainer/<str:code>/", referral_signup, name="referral-signup"),
+    # Espace mutualiste (portail)
+    path("espace/", member_portal, name="member-portal"),
+    path("espace/parrainage/", member_portal_referrals, name="member-portal-referrals"),
     path("console/profils-financiers/nouveau/", create_financial_profile, name="create-financial-profile"),
     path("console/projets/nouveau/", create_project, name="create-project"),
     path("console/simulations/nouvelle/", create_simulation, name="create-simulation"),

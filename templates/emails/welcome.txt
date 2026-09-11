@@ -1,0 +1,18 @@
+Bonjour {{ first_name }}{% if last_name %} {{ last_name }}{% endif %},
+
+Bienvenue sur DGA Mutuelle !
+
+{% if mutuelle %}Votre compte a été créé et rattaché à la mutuelle {{ mutuelle_name }}.
+{% else %}Votre compte a été créé avec succès.
+{% endif %}
+Vous pouvez dès à présent accéder à votre espace :
+
+{{ dashboard_url }}
+
+Pour vous connecter à tout moment :
+{{ login_url }}
+
+Pour toute question, n'hésitez pas à répondre à cet email ou à contacter votre administrateur de mutuelle.
+
+--
+L'équipe DGA Mutuelle

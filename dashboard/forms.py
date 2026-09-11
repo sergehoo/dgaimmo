@@ -503,14 +503,16 @@ class MemberCreateForm(StyledModelForm):
             "real_estate_objective": "Objectifs immobiliers personnels",
         }
 
-    def __init__(self, *args, mutuelle=None, **kwargs):
+    def __init__(self, *args, mutuelle=None, referred_by=None, **kwargs):
         """
         Args:
             mutuelle: Mutuelle d'affectation (auto-injectée par la vue depuis
                 request.mutuelle ou request.user.default_mutuelle).
+            referred_by: instance ``Member`` parrain (posée par un lien de parrainage).
         """
         super().__init__(*args, **kwargs)
         self._mutuelle = mutuelle
+        self._referred_by = referred_by
         self.fields["member_code"].required = False
         self.fields["member_code"].help_text = "Laissez vide pour générer un code automatiquement."
         # Banques actives uniquement
@@ -596,8 +598,19 @@ class MemberCreateForm(StyledModelForm):
         instance.qr_token = f"qr-{instance.member_code.lower()}-{uuid.uuid4().hex[:8]}"
         if not instance.joined_at:
             instance.joined_at = timezone.now().date()
+        # Parrainage : rattachement au parrain si valide (même mutuelle,
+        # pas d'auto-parrainage, uniquement à la création)
+        if (
+            self._referred_by
+            and not instance.pk
+            and getattr(self._referred_by, "mutuelle_id", None) == getattr(instance, "mutuelle_id", None)
+        ):
+            instance.referred_by = self._referred_by
         if commit:
             instance.save()
+            # Génère le code de parrainage à la création
+            if not instance.referral_code:
+                instance.ensure_referral_code()
         return instance
 
 

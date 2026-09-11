@@ -304,9 +304,46 @@ def create_invitation(
     mutuelle, email: str, *, invited_by=None, full_name: str = "",
     message: str = "", ttl_days: int = 14,
 ) -> MemberInvitation:
+    """Crée une nouvelle invitation.
+
+    Anti-abus :
+    - si le membre est déjà rattaché à la mutuelle (email dédupliqué), on
+      lève ``ValueError``.
+    - si une invitation ``PENDING``/``SENT`` non expirée existe déjà pour cet
+      email + cette mutuelle, on la retourne au lieu d'en créer une nouvelle.
+    """
+    email_norm = email.strip().lower()
+    if not email_norm:
+        raise ValueError("Email invalide.")
+
+    # 1) Le prospect est-il déjà membre effectif ?
+    if Member.all_objects.filter(mutuelle=mutuelle, email=email_norm).exists():
+        raise ValueError(
+            "Un membre avec cet email est déjà enregistré dans cette mutuelle."
+        )
+
+    # 2) Invitation active existante → réutilisation (évite l'accumulation
+    #    de liens valides pour le même prospect).
+    existing = (
+        MemberInvitation.all_objects
+        .filter(
+            mutuelle=mutuelle,
+            email=email_norm,
+            status__in=[MemberInvitation.Status.PENDING, MemberInvitation.Status.SENT],
+            expires_at__gt=timezone.now(),
+        )
+        .order_by("-created_at")
+        .first()
+    )
+    if existing:
+        # On rallonge la date d'expiration si l'admin demande un nouveau lien
+        existing.expires_at = timezone.now() + timedelta(days=ttl_days)
+        existing.save(update_fields=["expires_at"])
+        return existing
+
     return MemberInvitation.all_objects.create(
         mutuelle=mutuelle,
-        email=email.strip().lower(),
+        email=email_norm,
         full_name=full_name.strip(),
         invited_by=invited_by,
         expires_at=timezone.now() + timedelta(days=ttl_days),

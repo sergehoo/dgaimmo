@@ -16,7 +16,13 @@ import uuid
 from ai_engine.models import AIAnalysis
 from ai_engine.services import generate_mutuelle_decision_note
 from accounts.models import LoginEvent, OTPChallenge, UserDevice
-from accounts.services import create_otp_challenge, record_login_event, upsert_user_device, verify_otp_challenge
+from accounts.services import (
+    create_otp_challenge,
+    record_login_event,
+    send_welcome_email,
+    upsert_user_device,
+    verify_otp_challenge,
+)
 from claims.models import AssistanceClaim
 from claims.services import advance_claim
 from contributions.models import Contribution, ContributionPlan
@@ -95,6 +101,27 @@ class SecureLoginView(LoginView):
         email = self.request.POST.get("username", "")
         record_login_event(self.request, LoginEvent.Status.FAILED, email=email, metadata={"errors": form.errors.get_json_data()})
         return super().form_invalid(form)
+
+    def get_success_url(self):
+        """Routing par rôle : mutualiste → portail perso, sinon dashboard admin."""
+        # Respect explicite du ?next=... s'il est présent
+        redirect_to = self.request.POST.get(self.redirect_field_name, self.request.GET.get(self.redirect_field_name, ""))
+        if redirect_to:
+            return super().get_success_url()
+        user = self.request.user
+        try:
+            has_member_profile = Member.all_objects.filter(user=user).exists()
+        except Exception:
+            has_member_profile = False
+        is_staff_of_mutuelle = (
+            user.is_superuser
+            or MutuelleMembership.objects.filter(user=user, active=True)
+            .exclude(role="member")
+            .exists()
+        )
+        if has_member_profile and not is_staff_of_mutuelle:
+            return reverse("member-portal")
+        return super().get_success_url()
 
 
 def _user_accessible_mutuelles(user):
@@ -191,8 +218,11 @@ def public_mutuelle_signup(request):
         MutuelleMembership.objects.create(mutuelle=mutuelle, user=user, role="admin", permissions=["*"], active=True)
         TenantQuota.objects.get_or_create(mutuelle=mutuelle)
         record_login_event(request, LoginEvent.Status.SUCCESS, user=user, metadata={"source": "public_mutuelle_signup"})
+        # Email de bienvenue (best-effort — n'interrompt jamais le workflow)
+        send_welcome_email(user, mutuelle=mutuelle, request=request)
         login(request, user, backend="django.contrib.auth.backends.ModelBackend")
         upsert_user_device(request, user, trusted=False)
+        messages.success(request, f"Bienvenue {user.first_name or user.email} ! Un email de confirmation vous a été envoyé.")
         return redirect("mutuelle-detail", mutuelle_id=mutuelle.id)
     return render(request, "dashboard/signup_mutuelle.html", {"form": form})
 
@@ -927,6 +957,16 @@ def submit_contact_request(request):
 
 @login_required
 def console_dashboard(request):
+    # Mutualiste sans rôle staff → portail personnel
+    user = request.user
+    is_staff_of_mutuelle = (
+        user.is_superuser
+        or MutuelleMembership.objects.filter(user=user, active=True)
+        .exclude(role="member")
+        .exists()
+    )
+    if not is_staff_of_mutuelle and Member.all_objects.filter(user=user).exists():
+        return redirect("member-portal")
     context = _global_context(request)
     context.update(_mutuelle_context(_active_mutuelle(request)))
     context["active_tab"] = "dashboard"
@@ -1618,23 +1658,31 @@ def send_member_invitations(request):
 
     form = MemberInvitationForm(request.POST or None)
     sent_invitations = []
+    invitation_errors = []
     if request.method == "POST" and form.is_valid():
         data = form.cleaned_data
         for email in data["emails"]:
-            invitation = create_invitation(
-                active_mutuelle,
-                email,
-                invited_by=request.user,
-                message=data.get("message", ""),
-                ttl_days=data["ttl_days"],
-            )
+            try:
+                invitation = create_invitation(
+                    active_mutuelle,
+                    email,
+                    invited_by=request.user,
+                    message=data.get("message", ""),
+                    ttl_days=data["ttl_days"],
+                )
+            except ValueError as exc:
+                invitation_errors.append((email, str(exc)))
+                continue
             send_member_invitation(invitation, request=request)
             sent_invitations.append(invitation)
 
-        messages.success(
-            request,
-            f"{len(sent_invitations)} invitation(s) générée(s) — les liens sont actifs pour {data['ttl_days']} jours.",
-        )
+        if sent_invitations:
+            messages.success(
+                request,
+                f"{len(sent_invitations)} invitation(s) générée(s) — les liens sont actifs pour {data['ttl_days']} jours.",
+            )
+        for email, msg in invitation_errors:
+            messages.warning(request, f"{email} : {msg}")
 
     # Liste des invitations récentes de la mutuelle (info opérationnelle)
     from memberships.models import MemberInvitation
@@ -1670,9 +1718,12 @@ def accept_member_invitation(request, token):
 
     invitation = get_object_or_404(MemberInvitation.all_objects, token=token)
 
-    # Garde-fous
+    # Garde-fous : accepté, annulé, expiré → écrans dédiés
     if invitation.status == MemberInvitation.Status.ACCEPTED:
         context = {"invitation": invitation, "state": "already_accepted"}
+        return render(request, "dashboard/accept_invitation_state.html", context)
+    if invitation.status == MemberInvitation.Status.CANCELLED:
+        context = {"invitation": invitation, "state": "expired"}
         return render(request, "dashboard/accept_invitation_state.html", context)
     if not invitation.is_usable:
         invitation.status = MemberInvitation.Status.EXPIRED
@@ -1699,6 +1750,34 @@ def accept_member_invitation(request, token):
         invitation.status = MemberInvitation.Status.ACCEPTED
         invitation.used_at = timezone.now()
         invitation.save(update_fields=["member", "status", "used_at"])
+        # Email de bienvenue si l'email est fourni + user associé au membre créé
+        try:
+            if member.email:
+                User = _get_user_model()
+                user, _created = User.objects.get_or_create(
+                    email=member.email,
+                    defaults={
+                        "username": member.email,
+                        "first_name": member.first_name,
+                        "last_name": member.last_name,
+                        "phone": member.phone or None,
+                        "role": User.Role.MEMBER,
+                        "default_mutuelle": invitation.mutuelle,
+                    },
+                )
+                if _created:
+                    # Le user peut activer son compte via password reset
+                    user.set_unusable_password()
+                    user.save(update_fields=["password"])
+                    MutuelleMembership.objects.get_or_create(
+                        mutuelle=invitation.mutuelle, user=user,
+                        defaults={"role": "member", "permissions": [], "active": True},
+                    )
+                    member.user = user
+                    member.save(update_fields=["user"])
+                send_welcome_email(user, mutuelle=invitation.mutuelle, request=request)
+        except Exception:  # pragma: no cover
+            pass
         return render(
             request,
             "dashboard/accept_invitation_state.html",
@@ -1715,6 +1794,218 @@ def accept_member_invitation(request, token):
         "back_url": None,
     }
     return render(request, "dashboard/accept_invitation_form.html", context)
+
+
+def _get_user_model():
+    from django.contrib.auth import get_user_model
+    return get_user_model()
+
+
+# --- Parrainage : signup public via lien /parrainer/<code>/ ------------------
+def referral_signup(request, code):
+    """Ouvre le formulaire d'adhésion pré-rattaché au parrain propriétaire du code.
+
+    Anti-abus :
+    - code inconnu ou parrain suspendu → 404
+    - auto-parrainage : l'utilisateur ne peut pas s'inscrire avec l'email du parrain
+    """
+    from dashboard.forms import MemberCreateForm
+
+    referrer = Member.all_objects.select_related("mutuelle").filter(referral_code=code).first()
+    if referrer is None:
+        raise Http404("Code de parrainage inconnu ou expiré.")
+    if referrer.status == Member.Status.SUSPENDED:
+        raise Http404("Ce parrainage n'est plus actif.")
+
+    mutuelle = referrer.mutuelle
+
+    form = MemberCreateForm(
+        request.POST or None,
+        request.FILES or None,
+        mutuelle=mutuelle,
+        referred_by=referrer,
+    )
+
+    if request.method == "POST" and form.is_valid():
+        # Blocage anti auto-parrainage : email identique au parrain
+        email = (form.cleaned_data.get("email") or "").strip().lower()
+        phone = (form.cleaned_data.get("phone") or "").strip()
+        if email and referrer.email and email == referrer.email.lower():
+            form.add_error("email", "Vous ne pouvez pas utiliser votre propre lien de parrainage.")
+        elif phone and referrer.phone and phone == referrer.phone:
+            form.add_error("phone", "Vous ne pouvez pas utiliser votre propre lien de parrainage.")
+        else:
+            # Doublons (même téléphone/email dans la mutuelle) → message clair
+            duplicate = Member.all_objects.filter(mutuelle=mutuelle, phone=phone).exists()
+            if email:
+                duplicate = duplicate or Member.all_objects.filter(mutuelle=mutuelle, email=email).exists()
+            if duplicate:
+                form.add_error(None, "Un membre avec ce téléphone ou cet email existe déjà dans cette mutuelle.")
+            else:
+                member = form.save()
+                # Filet de sécurité : garantir l'attribution du filleul au parrain
+                # même si le form.save() court-circuite le rattachement (test
+                # de robustesse : cas d'objets déjà persistés, IDs UUID…).
+                if not member.referred_by_id:
+                    member.referred_by = referrer
+                    member.save(update_fields=["referred_by"])
+                # Email de bienvenue best-effort
+                try:
+                    if member.email:
+                        User = _get_user_model()
+                        user, _created = User.objects.get_or_create(
+                            email=member.email,
+                            defaults={
+                                "username": member.email,
+                                "first_name": member.first_name,
+                                "last_name": member.last_name,
+                                "phone": member.phone or None,
+                                "role": User.Role.MEMBER,
+                                "default_mutuelle": mutuelle,
+                            },
+                        )
+                        if _created:
+                            user.set_unusable_password()
+                            user.save(update_fields=["password"])
+                            MutuelleMembership.objects.get_or_create(
+                                mutuelle=mutuelle, user=user,
+                                defaults={"role": "member", "permissions": [], "active": True},
+                            )
+                            member.user = user
+                            member.save(update_fields=["user"])
+                        send_welcome_email(user, mutuelle=mutuelle, request=request)
+                except Exception:  # pragma: no cover
+                    pass
+                return render(
+                    request,
+                    "dashboard/accept_invitation_state.html",
+                    {
+                        "invitation": None,
+                        "member": member,
+                        "referrer": referrer,
+                        "state": "success",
+                    },
+                )
+
+    context = {
+        "form": form,
+        "referrer": referrer,
+        "active_mutuelle": mutuelle,
+        "title": f"Rejoignez {mutuelle.name} — parrainé par {referrer.first_name}",
+        "subtitle": f"{referrer.first_name} {referrer.last_name} vous invite à rejoindre la mutuelle. Complétez votre profil pour finaliser.",
+        "submit_label": "Rejoindre la mutuelle",
+        "back_url": None,
+        "referral_mode": True,
+    }
+    return render(request, "dashboard/accept_invitation_form.html", context)
+
+
+# --- Espace Mutualiste (portail personnel) ------------------------------------
+def _member_from_user(user):
+    """Retourne le Member associé au user connecté, ou None."""
+    if not user or not user.is_authenticated:
+        return None
+    return (
+        Member.all_objects.select_related("mutuelle", "referred_by")
+        .filter(user=user)
+        .first()
+    )
+
+
+@login_required
+def member_portal(request):
+    """Portail mutualiste : profil, cotisations, paiements, invitations,
+    parrainage, notifications, actions rapides."""
+    from contributions.models import Contribution
+    from notifications.models import Notification
+
+    member = _member_from_user(request.user)
+    if member is None:
+        # Redirige un admin mutuelle vers son propre dashboard admin
+        if request.user.is_authenticated and (
+            request.user.is_superuser
+            or MutuelleMembership.objects.filter(user=request.user, active=True).exists()
+        ):
+            return redirect("dashboard-home")
+        messages.info(
+            request,
+            "Aucun profil mutualiste n'est associé à ce compte. Contactez votre administrateur.",
+        )
+        return redirect("landing-page")
+
+    mutuelle = member.mutuelle
+    # S'assure que le code de parrainage est présent
+    member.ensure_referral_code()
+
+    contributions = (
+        Contribution.all_objects
+        .filter(mutuelle=mutuelle, member=member)
+        .select_related("plan")
+        .order_by("-due_date")[:12]
+    )
+    contributions_paid = sum(
+        (c.amount for c in contributions if c.status == Contribution.Status.PAID),
+        Decimal("0"),
+    )
+    contributions_due = (
+        Contribution.all_objects
+        .filter(mutuelle=mutuelle, member=member, status__in=[
+            Contribution.Status.DUE, Contribution.Status.OVERDUE, Contribution.Status.PARTIAL
+        ])
+        .aggregate(total=Sum("amount"))["total"] or Decimal("0")
+    )
+    payments = (
+        Payment.all_objects
+        .filter(mutuelle=mutuelle, member=member)
+        .order_by("-created_at")[:8]
+    )
+    notifs = (
+        Notification.all_objects
+        .filter(mutuelle=mutuelle)
+        .filter(models.Q(member=member) | models.Q(member__isnull=True))
+        .order_by("-created_at")[:10]
+    )
+    referrals = member.referrals.select_related("mutuelle").order_by("-created_at")[:10]
+
+    context = {
+        "member": member,
+        "mutuelle": mutuelle,
+        "active_mutuelle": mutuelle,
+        "contributions": contributions,
+        "contributions_paid": contributions_paid,
+        "contributions_due": contributions_due,
+        "payments": payments,
+        "notifications": notifs,
+        "referrals": referrals,
+        "referrals_count": member.referrals_count,
+        "active_referrals_count": member.active_referrals_count,
+        "referral_url": member.referral_url(request=request),
+        "tenant_primary_color": (mutuelle.primary_color if mutuelle else "#0b55d9") or "#0b55d9",
+        "tenant_accent_color": (mutuelle.accent_color if mutuelle else "#0bbf63") or "#0bbf63",
+    }
+    return render(request, "dashboard/member_portal.html", context)
+
+
+@login_required
+def member_portal_referrals(request):
+    """Détail complet des filleuls du membre connecté."""
+    member = _member_from_user(request.user)
+    if member is None:
+        return redirect("landing-page")
+    member.ensure_referral_code()
+    referrals = member.referrals.select_related("mutuelle").order_by("-created_at")
+    context = {
+        "member": member,
+        "mutuelle": member.mutuelle,
+        "active_mutuelle": member.mutuelle,
+        "referrals": referrals,
+        "referrals_count": member.referrals_count,
+        "active_referrals_count": member.active_referrals_count,
+        "referral_url": member.referral_url(request=request),
+        "tenant_primary_color": (member.mutuelle.primary_color if member.mutuelle else "#0b55d9") or "#0b55d9",
+        "tenant_accent_color": (member.mutuelle.accent_color if member.mutuelle else "#0bbf63") or "#0bbf63",
+    }
+    return render(request, "dashboard/member_portal_referrals.html", context)
 
 
 @login_required

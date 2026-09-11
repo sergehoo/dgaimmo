@@ -1,0 +1,233 @@
+{% extends "base/app.html" %}
+{% load static humanize %}
+{% block content %}
+<div class="min-h-screen bg-[#f8fbff] text-[#06194a]" style="--tenant-primary: {{ tenant_primary_color|default:'#0b55d9' }}; --tenant-accent: {{ tenant_accent_color|default:'#0bbf63' }};">
+  <!-- Header simplifié pour l'espace mutualiste -->
+  <header class="sticky top-0 z-30 border-b border-[#e8eef8] bg-white/95 backdrop-blur">
+    <div class="mx-auto flex h-16 max-w-[1240px] items-center justify-between gap-4 px-4">
+      <a href="{% url 'landing-page' %}" class="flex shrink-0 items-center gap-2 no-underline">
+        <img src="{% static 'img/logoDGAmutuelle.png' %}" width="150" alt="DGA Mutuelle">
+      </a>
+      <nav class="hidden gap-2 text-sm font-black text-[#172b5f] md:flex">
+        <a href="{% url 'member-portal' %}" class="rounded-xl bg-[#eaf2ff] px-4 py-2 text-[#0b55d9]">Mon espace</a>
+        <a href="{% url 'member-portal-referrals' %}" class="rounded-xl px-4 py-2 hover:bg-[#f3f7ff]">Parrainage</a>
+        <a href="{% url 'profile-center' %}" class="rounded-xl px-4 py-2 hover:bg-[#f3f7ff]">Profil</a>
+      </nav>
+      <div class="flex shrink-0 items-center gap-3">
+        <span class="grid h-9 w-9 place-items-center rounded-full text-xs font-black text-white" style="background: var(--tenant-primary)">
+          {{ member.first_name|first }}{{ member.last_name|first }}
+        </span>
+        <form method="post" action="{% url 'logout' %}">{% csrf_token %}
+          <button class="rounded-lg bg-[#f3f7ff] px-3 py-2 text-xs font-black text-[#536484] hover:bg-[#e5edf8]">
+            <i class="fa-solid fa-arrow-right-from-bracket mr-1"></i>Sortir
+          </button>
+        </form>
+      </div>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-[1240px] px-4 py-8">
+    {% if messages %}
+      <div class="mb-6 grid gap-2">
+        {% for m in messages %}
+          <div class="rounded-2xl border px-4 py-3 text-sm font-bold {% if m.tags == 'success' %}border-emerald-100 bg-emerald-50 text-emerald-700{% elif m.tags == 'warning' %}border-amber-100 bg-amber-50 text-amber-800{% elif m.tags == 'error' %}border-red-100 bg-red-50 text-red-700{% else %}border-blue-100 bg-blue-50 text-blue-700{% endif %}">{{ m }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <!-- Hero personnel -->
+    <section class="grid gap-6 rounded-[28px] border border-white/60 bg-gradient-to-br from-[#eef5ff] via-white to-[#e9fff3] p-6 shadow-xl shadow-blue-950/5 md:grid-cols-[1.2fr_.8fr] md:p-10">
+      <div>
+        <p class="text-xs font-black uppercase tracking-[.14em]" style="color: var(--tenant-primary)">Espace mutualiste</p>
+        <h1 class="mt-2 text-3xl font-black md:text-4xl">Bonjour {{ member.first_name }} 👋</h1>
+        <p class="mt-2 text-sm font-bold leading-6 text-[#536484]">
+          Membre de <b>{{ mutuelle.name }}</b> · code <span class="font-mono text-[#0b55d9]">{{ member.member_code }}</span>
+          · statut
+          <span class="ml-1 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-black
+            {% if member.status == 'active' %}bg-emerald-100 text-emerald-700
+            {% elif member.status == 'prospect' %}bg-blue-100 text-blue-700
+            {% elif member.status == 'delinquent' %}bg-amber-100 text-amber-800
+            {% else %}bg-red-100 text-red-700{% endif %}">
+            {{ member.get_status_display }}
+          </span>
+        </p>
+        <div class="mt-6 flex flex-wrap gap-3">
+          <a href="{% url 'profile-center' %}" class="inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-black text-[#06337d] shadow-lg shadow-blue-900/5 ring-1 ring-[#e5edf8]"><i class="fa-solid fa-user"></i> Mon profil</a>
+          <a href="{% url 'member-portal-referrals' %}" class="inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-black text-white shadow-lg" style="background: var(--tenant-primary); box-shadow: 0 12px 24px rgba(11,85,217,0.15);"><i class="fa-solid fa-people-arrows"></i> Parrainer</a>
+        </div>
+      </div>
+      <div class="rounded-3xl border border-white/70 bg-white/80 p-5 shadow-inner">
+        <p class="text-xs font-black uppercase tracking-[.14em] text-[#536484]">Cotisations à jour</p>
+        <p class="mt-1 text-3xl font-black" style="color: var(--tenant-primary)">{{ contributions_paid|floatformat:0|intcomma }} FCFA</p>
+        <p class="mt-4 text-xs font-black uppercase tracking-[.14em] text-[#536484]">Solde dû</p>
+        <p class="mt-1 text-2xl font-black text-[#c74a2b]">{{ contributions_due|floatformat:0|intcomma }} FCFA</p>
+      </div>
+    </section>
+
+    <!-- 4 KPI -->
+    <section class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div class="rounded-3xl border border-[#e5edf8] bg-white p-5">
+        <p class="text-xs font-black uppercase tracking-[.14em] text-[#536484]">Cotisations</p>
+        <p class="mt-2 text-2xl font-black">{{ contributions|length }}</p>
+        <p class="mt-1 text-xs font-bold text-[#536484]">échéances récentes</p>
+      </div>
+      <div class="rounded-3xl border border-[#e5edf8] bg-white p-5">
+        <p class="text-xs font-black uppercase tracking-[.14em] text-[#536484]">Paiements</p>
+        <p class="mt-2 text-2xl font-black">{{ payments|length }}</p>
+        <p class="mt-1 text-xs font-bold text-[#536484]">enregistrés</p>
+      </div>
+      <div class="rounded-3xl border border-[#e5edf8] bg-white p-5">
+        <p class="text-xs font-black uppercase tracking-[.14em] text-[#536484]">Filleuls</p>
+        <p class="mt-2 text-2xl font-black">{{ referrals_count }}</p>
+        <p class="mt-1 text-xs font-bold text-[#536484]">dont {{ active_referrals_count }} actif·s</p>
+      </div>
+      <div class="rounded-3xl border border-[#e5edf8] bg-white p-5">
+        <p class="text-xs font-black uppercase tracking-[.14em] text-[#536484]">Ancienneté</p>
+        <p class="mt-2 text-2xl font-black">
+          {% if member.joined_at %}{{ member.joined_at|date:"d/m/Y" }}{% else %}—{% endif %}
+        </p>
+        <p class="mt-1 text-xs font-bold text-[#536484]">date d'adhésion</p>
+      </div>
+    </section>
+
+    <!-- Bloc parrainage rapide -->
+    <section class="mt-6 rounded-3xl border border-[#e5edf8] bg-white p-6" x-data="{ copied: false, share() { navigator.clipboard.writeText('{{ referral_url|escapejs }}').then(() => { this.copied = true; setTimeout(() => this.copied = false, 2000); }); } }">
+      <div class="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p class="text-xs font-black uppercase tracking-[.14em]" style="color: var(--tenant-primary)"><i class="fa-solid fa-people-arrows mr-1"></i> Mon lien de parrainage</p>
+          <p class="mt-2 text-sm font-bold text-[#536484]">Partagez ce lien à vos proches. Chaque inscription réalisée depuis votre lien vous sera attribuée automatiquement.</p>
+        </div>
+        <span class="rounded-full bg-[#eaf2ff] px-3 py-1 text-xs font-black text-[#0b55d9]">Code : {{ member.referral_code }}</span>
+      </div>
+      <div class="mt-4 flex flex-wrap items-center gap-3">
+        <input class="min-h-[48px] flex-1 rounded-xl border border-[#dbe6f5] bg-[#f8fbff] px-4 text-sm font-bold text-[#0b55d9]" value="{{ referral_url }}" readonly onclick="this.select()">
+        <button type="button" @click="share()" class="inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-black text-white shadow-lg" style="background: var(--tenant-primary);">
+          <template x-if="!copied"><span><i class="fa-solid fa-copy mr-1"></i> Copier</span></template>
+          <template x-if="copied"><span><i class="fa-solid fa-check mr-1"></i> Copié !</span></template>
+        </button>
+      </div>
+    </section>
+
+    <!-- Sections en 2 colonnes -->
+    <section class="mt-6 grid gap-6 lg:grid-cols-2">
+      <!-- Cotisations récentes -->
+      <div class="rounded-3xl border border-[#e5edf8] bg-white p-6">
+        <div class="mb-4 flex items-center justify-between">
+          <h2 class="text-lg font-black">Cotisations récentes</h2>
+          <span class="rounded-full bg-[#eaf2ff] px-3 py-1 text-xs font-black text-[#0b55d9]">{{ contributions|length }}</span>
+        </div>
+        {% if contributions %}
+          <div class="grid gap-2">
+            {% for c in contributions %}
+              <div class="flex items-center justify-between rounded-xl bg-[#f7faff] p-3 ring-1 ring-[#edf2fb]">
+                <div>
+                  <p class="text-sm font-black">{{ c.due_date|date:"d/m/Y" }} · {{ c.amount|floatformat:0|intcomma }} {{ c.currency|default:'FCFA' }}</p>
+                  <p class="text-xs font-bold text-[#536484]">{{ c.plan.name|default:'Cotisation' }}</p>
+                </div>
+                <span class="rounded-full px-3 py-1 text-xs font-black
+                  {% if c.status == 'paid' %}bg-emerald-100 text-emerald-700
+                  {% elif c.status == 'overdue' %}bg-red-100 text-red-700
+                  {% elif c.status == 'partial' %}bg-amber-100 text-amber-700
+                  {% else %}bg-blue-100 text-blue-700{% endif %}">
+                  {{ c.get_status_display }}
+                </span>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="rounded-2xl bg-[#f7faff] p-6 text-center text-sm font-bold text-[#536484]">
+            <i class="fa-regular fa-file-lines mb-2 text-3xl text-[#8095b8]"></i>
+            <p>Aucune cotisation enregistrée pour le moment.</p>
+          </div>
+        {% endif %}
+      </div>
+
+      <!-- Notifications -->
+      <div class="rounded-3xl border border-[#e5edf8] bg-white p-6">
+        <div class="mb-4 flex items-center justify-between">
+          <h2 class="text-lg font-black">Notifications</h2>
+          <span class="rounded-full bg-[#eaf2ff] px-3 py-1 text-xs font-black text-[#0b55d9]">{{ notifications|length }}</span>
+        </div>
+        {% if notifications %}
+          <div class="grid gap-2">
+            {% for n in notifications %}
+              <div class="rounded-xl bg-[#f7faff] p-3 ring-1 ring-[#edf2fb]">
+                <p class="text-sm font-black">{{ n.subject|default:n.channel }}</p>
+                <p class="text-xs font-semibold text-[#536484]">{{ n.body|default:''|truncatechars:120 }}</p>
+                <p class="mt-1 text-xs font-bold text-[#8095b8]">{{ n.created_at|date:"d/m/Y H:i" }}</p>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="rounded-2xl bg-[#f7faff] p-6 text-center text-sm font-bold text-[#536484]">
+            <i class="fa-regular fa-bell mb-2 text-3xl text-[#8095b8]"></i>
+            <p>Aucune notification pour le moment.</p>
+          </div>
+        {% endif %}
+      </div>
+
+      <!-- Paiements -->
+      <div class="rounded-3xl border border-[#e5edf8] bg-white p-6">
+        <h2 class="mb-4 text-lg font-black">Paiements récents</h2>
+        {% if payments %}
+          <div class="grid gap-2">
+            {% for p in payments %}
+              <div class="flex items-center justify-between rounded-xl bg-[#f7faff] p-3 ring-1 ring-[#edf2fb]">
+                <div>
+                  <p class="text-sm font-black">{{ p.amount|floatformat:0|intcomma }} {{ p.currency|default:'FCFA' }}</p>
+                  <p class="text-xs font-bold text-[#536484]">{{ p.provider|default:p.channel|default:'—' }} · {{ p.created_at|date:"d/m/Y" }}</p>
+                </div>
+                <span class="rounded-full px-3 py-1 text-xs font-black
+                  {% if p.status == 'succeeded' %}bg-emerald-100 text-emerald-700
+                  {% elif p.status == 'failed' %}bg-red-100 text-red-700
+                  {% else %}bg-blue-100 text-blue-700{% endif %}">
+                  {{ p.get_status_display|default:p.status }}
+                </span>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="rounded-2xl bg-[#f7faff] p-6 text-center text-sm font-bold text-[#536484]">
+            <i class="fa-regular fa-credit-card mb-2 text-3xl text-[#8095b8]"></i>
+            <p>Aucun paiement enregistré.</p>
+          </div>
+        {% endif %}
+      </div>
+
+      <!-- Filleuls récents -->
+      <div class="rounded-3xl border border-[#e5edf8] bg-white p-6">
+        <div class="mb-4 flex items-center justify-between">
+          <h2 class="text-lg font-black">Mes filleuls</h2>
+          <a href="{% url 'member-portal-referrals' %}" class="text-xs font-black text-[#0b55d9] hover:underline">Voir tout →</a>
+        </div>
+        {% if referrals %}
+          <div class="grid gap-2">
+            {% for r in referrals %}
+              <div class="flex items-center justify-between rounded-xl bg-[#f7faff] p-3 ring-1 ring-[#edf2fb]">
+                <div>
+                  <p class="text-sm font-black">{{ r.first_name }} {{ r.last_name }}</p>
+                  <p class="text-xs font-bold text-[#536484]">{{ r.created_at|date:"d/m/Y" }}</p>
+                </div>
+                <span class="rounded-full px-3 py-1 text-xs font-black
+                  {% if r.status == 'active' %}bg-emerald-100 text-emerald-700
+                  {% else %}bg-blue-100 text-blue-700{% endif %}">
+                  {{ r.get_status_display }}
+                </span>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="rounded-2xl bg-[#f7faff] p-6 text-center text-sm font-bold text-[#536484]">
+            <i class="fa-regular fa-user-plus mb-2 text-3xl text-[#8095b8]"></i>
+            <p>Vous n'avez pas encore de filleul. Partagez votre lien pour commencer !</p>
+          </div>
+        {% endif %}
+      </div>
+    </section>
+
+    <footer class="mt-10 text-center text-xs font-bold text-[#8095b8]">
+      DGA Mutuelle · Espace mutualiste sécurisé
+    </footer>
+  </main>
+</div>
+{% endblock %}

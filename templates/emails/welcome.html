@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="fr">
+<head><meta charset="utf-8"><title>Bienvenue sur DGA Mutuelle</title></head>
+<body style="margin:0;padding:0;background:#f7fbff;font-family:'Inter',Arial,sans-serif;color:#06194a">
+  <table width="100%" cellpadding="0" cellspacing="0" style="padding:32px 0">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:24px;box-shadow:0 12px 32px rgba(11,85,217,.08);overflow:hidden">
+        <tr><td style="background:{% if mutuelle %}{{ mutuelle.primary_color|default:'#003b98' }}{% else %}#003b98{% endif %};padding:32px;color:#fff">
+          <h1 style="margin:0;font-size:24px;font-weight:900">Bienvenue sur DGA Mutuelle</h1>
+          {% if mutuelle %}<p style="margin:8px 0 0;font-size:13px;font-weight:700;color:rgba(255,255,255,.85)">Mutuelle : {{ mutuelle_name }}</p>{% endif %}
+        </td></tr>
+        <tr><td style="padding:32px">
+          <p style="margin:0 0 16px;font-size:16px">Bonjour {{ first_name }}{% if last_name %} {{ last_name }}{% endif %},</p>
+          <p style="margin:0 0 16px;line-height:1.6">
+            {% if mutuelle %}Votre compte a été créé et rattaché à la mutuelle <b>{{ mutuelle_name }}</b>.{% else %}Votre compte a été créé avec succès.{% endif %}
+          </p>
+          <p style="margin:0 0 24px;line-height:1.6">Vous pouvez dès à présent accéder à votre espace personnel, suivre vos cotisations, vos projets immobiliers, et interagir avec votre communauté.</p>
+          <p style="margin:0;text-align:center">
+            <a href="{{ dashboard_url }}" style="display:inline-block;padding:16px 32px;background:#003b98;color:#fff;text-decoration:none;border-radius:12px;font-weight:900;font-size:14px">
+              Accéder à mon espace →
+            </a>
+          </p>
+          <p style="margin:24px 0 0;font-size:12px;color:#536484;line-height:1.6">
+            Ou copiez ce lien dans votre navigateur : <a href="{{ dashboard_url }}" style="color:#0b55d9;word-break:break-all">{{ dashboard_url }}</a>
+          </p>
+          <div style="margin:24px 0 0;padding:16px;background:#f7faff;border-radius:12px;border-left:4px solid #0bbf63">
+            <p style="margin:0;font-size:13px;color:#0a5f38;line-height:1.5">
+              <b>Astuce :</b> pour vous connecter à tout moment, gardez cette adresse en signet : <a href="{{ login_url }}" style="color:#0b55d9">{{ login_url }}</a>
+            </p>
+          </div>
+        </td></tr>
+        <tr><td style="background:#f7faff;padding:20px;text-align:center;font-size:11px;color:#667899">
+          Email automatique DGA Mutuelle · vous recevez cet email suite à votre inscription
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
